@@ -2,9 +2,13 @@ version: '3.8'
 
 volumes:
   db_storage:
+    driver: local
   n8n_storage:
+    driver: local
   redis_storage:
+    driver: local
   n8n_files:
+    driver: local
 
 x-shared: &shared
   restart: always
