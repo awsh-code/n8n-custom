@@ -1,15 +1,5 @@
 version: '2.10.2'
 
-volumes:
-  db_storage:
-    external: true
-  n8n_storage:
-    external: true
-  redis_storage:
-    external: true
-  n8n_files:
-    external: true
-
 x-shared: &shared
   restart: always
   image: docker.n8n.io/n8nio/n8n
