@@ -10,9 +10,6 @@ x-shared: &shared
     - DB_POSTGRESDB_DATABASE=n8n
     - DB_POSTGRESDB_USER=changeUser
     - DB_POSTGRESDB_PASSWORD=changePassword
-    - EXECUTIONS_MODE=queue
-    - QUEUE_BULL_REDIS_HOST=redis
-    - QUEUE_HEALTH_CHECK_ACTIVE=true
     - NODE_FUNCTION_ALLOW_BUILTIN=*
     - NODE_FUNCTION_ALLOW_EXTERNAL=axios,cheerio,express,firebase-admin,firebase-functions,firebase-tools,fs,googleapis,https,http,mysql,mysql2,pg,pg-hstore,redis,sequelize,sequelize-cli,sharp,sqlite3,uuid,vue
   links:
@@ -48,8 +45,8 @@ services:
     ports:
       - 5678:5678
 
-  n8n-worker:
-    <<: *shared
-    command: worker
-    depends_on:
-      - n8n
+#  n8n-worker:
+#    <<: *shared
+#    command: worker
+#    depends_on:
+#      - n8n
