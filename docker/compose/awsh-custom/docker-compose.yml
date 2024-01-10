@@ -15,7 +15,6 @@ x-shared: &shared
     - QUEUE_HEALTH_CHECK_ACTIVE=true
     - NODE_FUNCTION_ALLOW_BUILTIN=*
     - NODE_FUNCTION_ALLOW_EXTERNAL=axios,cheerio,express,firebase-admin,firebase-functions,firebase-tools,fs,googleapis,https,http,mysql,mysql2,pg,pg-hstore,redis,sequelize,sequelize-cli,sharp,sqlite3,uuid,vue
-    - WEBHOOK_TUNNEL_URL=https://engine.santahelp.live
   links:
     - postgres
     - redis
