@@ -3,12 +3,16 @@ version: '3.8'
 volumes:
   db_storage:
     driver: local
+    external: true
   n8n_storage:
     driver: local
+    external: true
   redis_storage:
     driver: local
+    external: true
   n8n_files:
     driver: local
+    external: true
 
 x-shared: &shared
   restart: always
