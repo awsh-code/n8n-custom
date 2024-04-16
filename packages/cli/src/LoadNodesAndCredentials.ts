@@ -133,7 +133,7 @@ export class LoadNodesAndCredentials {
 			: [
 					...(await glob('n8n-nodes-*', globOptions)),
 					...(await glob('@*/n8n-nodes-*', { ...globOptions, deep: 2 })),
-			  ];
+				];
 
 		for (const packagePath of installedPackagePaths) {
 			try {
@@ -182,7 +182,7 @@ export class LoadNodesAndCredentials {
 			'node_modules',
 			packageName,
 		);
-		return this.runDirectoryLoader(PackageDirectoryLoader, finalNodeUnpackedPath);
+		return await this.runDirectoryLoader(PackageDirectoryLoader, finalNodeUnpackedPath);
 	}
 
 	async unloadPackage(packageName: string) {

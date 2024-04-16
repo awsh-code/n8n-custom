@@ -15,8 +15,10 @@ import type {
 } from 'n8n-workflow';
 import {
 	ApplicationError,
+	ErrorReporterProxy as ErrorReporter,
 	LoggerProxy as Logger,
 	toCronExpression,
+	TriggerCloseError,
 	WorkflowActivationError,
 	WorkflowDeactivationError,
 } from 'n8n-workflow';
@@ -209,8 +211,13 @@ export class ActiveWorkflows {
 
 		const w = this.activeWorkflows[workflowId];
 
-		w.triggerResponses?.forEach(async (r) => this.close(r, workflowId, 'trigger'));
-		w.pollResponses?.forEach(async (r) => this.close(r, workflowId, 'poller'));
+		for (const r of w.triggerResponses ?? []) {
+			await this.close(r, workflowId, 'trigger');
+		}
+
+		for (const r of w.pollResponses ?? []) {
+			await this.close(r, workflowId, 'poller');
+		}
 
 		delete this.activeWorkflows[workflowId];
 
@@ -219,10 +226,7 @@ export class ActiveWorkflows {
 
 	async removeAllTriggerAndPollerBasedWorkflows() {
 		for (const workflowId of Object.keys(this.activeWorkflows)) {
-			const w = this.activeWorkflows[workflowId];
-
-			w.triggerResponses?.forEach(async (r) => this.close(r, workflowId, 'trigger'));
-			w.pollResponses?.forEach(async (r) => this.close(r, workflowId, 'poller'));
+			await this.remove(workflowId);
 		}
 	}
 
@@ -236,6 +240,14 @@ export class ActiveWorkflows {
 		try {
 			await response.closeFunction();
 		} catch (e) {
+			if (e instanceof TriggerCloseError) {
+				Logger.error(
+					`There was a problem calling "closeFunction" on "${e.node.name}" in workflow "${workflowId}"`,
+				);
+				ErrorReporter.error(e, { extra: { target, workflowId } });
+				return;
+			}
+
 			const error = e instanceof Error ? e : new Error(`${e}`);
 
 			throw new WorkflowDeactivationError(

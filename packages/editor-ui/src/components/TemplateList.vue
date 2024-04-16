@@ -3,6 +3,7 @@
 		<div v-if="!simpleView" :class="$style.header">
 			<n8n-heading :bold="true" size="medium" color="text-light">
 				{{ $locale.baseText('templates.workflows') }}
+				<span v-if="totalCount > 0" data-test-id="template-count-label">({{ totalCount }})</span>
 				<span v-if="!loading && totalWorkflows" v-text="`(${totalWorkflows})`" />
 			</n8n-heading>
 		</div>
@@ -16,10 +17,10 @@
 				:last-item="index === workflows.length - 1 && !loading"
 				:use-workflow-button="useWorkflowButton"
 				@click="(e) => onCardClick(e, workflow.id)"
-				@useWorkflow="(e) => onUseWorkflow(e, workflow.id)"
+				@use-workflow="(e) => onUseWorkflow(e, workflow.id)"
 			/>
 			<div v-if="infiniteScrollEnabled" ref="loader" />
-			<div v-if="loading">
+			<div v-if="loading" data-test-id="templates-loading-container">
 				<TemplateCard
 					v-for="n in 4"
 					:key="'index-' + n"
@@ -55,13 +56,19 @@ export default defineComponent({
 		},
 		workflows: {
 			type: Array,
+			default: () => [],
 		},
 		totalWorkflows: {
 			type: Number,
+			default: 0,
 		},
 		simpleView: {
 			type: Boolean,
 			default: false,
+		},
+		totalCount: {
+			type: Number,
+			default: 0,
 		},
 	},
 	mounted() {

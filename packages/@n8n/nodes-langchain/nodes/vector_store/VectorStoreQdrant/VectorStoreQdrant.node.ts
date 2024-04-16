@@ -1,6 +1,6 @@
 import { type INodeProperties } from 'n8n-workflow';
-import type { QdrantLibArgs } from 'langchain/vectorstores/qdrant';
-import { QdrantVectorStore } from 'langchain/vectorstores/qdrant';
+import type { QdrantLibArgs } from '@langchain/community/vectorstores/qdrant';
+import { QdrantVectorStore } from '@langchain/community/vectorstores/qdrant';
 import type { Schemas as QdrantSchemas } from '@qdrant/js-client-rest';
 import { createVectorStoreNode } from '../shared/createVectorStoreNode';
 import { qdrantCollectionRLC } from '../shared/descriptions';
@@ -59,7 +59,7 @@ export const VectorStoreQdrant = createVectorStoreNode({
 			collectionName: collection,
 		};
 
-		return QdrantVectorStore.fromExistingCollection(embeddings, config);
+		return await QdrantVectorStore.fromExistingCollection(embeddings, config);
 	},
 	async populateVectorStore(context, embeddings, documents, itemIndex) {
 		const collectionName = context.getNodeParameter('qdrantCollection', itemIndex, '', {

@@ -1,10 +1,12 @@
 import { Service } from 'typedi';
 import { CacheService } from '@/services/cache/cache.service';
-import { type IWebhookData } from 'n8n-workflow';
+import type { IWebhookData } from 'n8n-workflow';
 import type { IWorkflowDb } from '@/Interfaces';
+import { TEST_WEBHOOK_TIMEOUT, TEST_WEBHOOK_TIMEOUT_BUFFER } from '@/constants';
+import { OrchestrationService } from './orchestration.service';
 
 export type TestWebhookRegistration = {
-	sessionId?: string;
+	pushRef?: string;
 	workflowEntity: IWorkflowDb;
 	destinationNode?: string;
 	webhook: IWebhookData;
@@ -12,7 +14,10 @@ export type TestWebhookRegistration = {
 
 @Service()
 export class TestWebhookRegistrationsService {
-	constructor(private readonly cacheService: CacheService) {}
+	constructor(
+		private readonly cacheService: CacheService,
+		private readonly orchestrationService: OrchestrationService,
+	) {}
 
 	private readonly cacheKey = 'test-webhooks';
 
@@ -20,6 +25,21 @@ export class TestWebhookRegistrationsService {
 		const hashKey = this.toKey(registration.webhook);
 
 		await this.cacheService.setHash(this.cacheKey, { [hashKey]: registration });
+
+		if (!this.orchestrationService.isMultiMainSetupEnabled) return;
+
+		/**
+		 * Multi-main setup: In a manual webhook execution, the main process that
+		 * handles a webhook might not be the same as the main process that created
+		 * the webhook. If so, after the test webhook has been successfully executed,
+		 * the handler process commands the creator process to clear its test webhooks.
+		 * We set a TTL on the key so that it is cleared even on creator process crash,
+		 * with an additional buffer to ensure this safeguard expiration will not delete
+		 * the key before the regular test webhook timeout fetches the key to delete it.
+		 */
+		const ttl = TEST_WEBHOOK_TIMEOUT + TEST_WEBHOOK_TIMEOUT_BUFFER;
+
+		await this.cacheService.expire(this.cacheKey, ttl);
 	}
 
 	async deregister(arg: IWebhookData | string) {
@@ -32,7 +52,7 @@ export class TestWebhookRegistrationsService {
 	}
 
 	async get(key: string) {
-		return this.cacheService.getHashValue<TestWebhookRegistration>(this.cacheKey, key);
+		return await this.cacheService.getHashValue<TestWebhookRegistration>(this.cacheKey, key);
 	}
 
 	async getAllKeys() {

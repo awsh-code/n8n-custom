@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isEqual } from 'lodash-es';
+import { isEmpty, isEqual } from 'lodash-es';
 
 import {
 	type FilterConditionValue,
@@ -21,7 +21,7 @@ import { useI18n } from '@/composables/useI18n';
 import { useDebounce } from '@/composables/useDebounce';
 import Condition from './Condition.vue';
 import CombinatorSelect from './CombinatorSelect.vue';
-import { resolveParameter } from '@/mixins/workflowHelpers';
+import { resolveParameter } from '@/composables/useWorkflowHelpers';
 import { v4 as uuid } from 'uuid';
 
 interface Props {
@@ -29,9 +29,10 @@ interface Props {
 	value: FilterValue;
 	path: string;
 	node: INode | null;
+	readOnly?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { readOnly: false });
 
 const emit = defineEmits<{
 	(event: 'valueChanged', value: { name: string; node: string; value: FilterValue }): void;
@@ -39,7 +40,7 @@ const emit = defineEmits<{
 
 const i18n = useI18n();
 const ndvStore = useNDVStore();
-const { callDebounced } = useDebounce();
+const { debounce } = useDebounce();
 
 function createCondition(): FilterConditionValue {
 	return { id: uuid(), leftValue: '', rightValue: '', operator: DEFAULT_OPERATOR_VALUE };
@@ -91,34 +92,51 @@ watch(
 
 		if (!isEqual(state.paramValue.options, newOptions)) {
 			state.paramValue.options = newOptions;
+			debouncedEmitChange();
 		}
 	},
 	{ immediate: true },
 );
 
-watch(state.paramValue, (value) => {
-	void callDebounced(
-		() => {
-			emit('valueChanged', { name: props.path, value, node: props.node?.name as string });
-		},
-		{ debounceTime: 1000 },
-	);
-});
+watch(
+	() => props.value,
+	(value) => {
+		if (isEmpty(value) || isEqual(state.paramValue, value)) return;
+
+		state.paramValue.conditions = value.conditions;
+		state.paramValue.combinator = value.combinator;
+		state.paramValue.options = value.options;
+	},
+);
+
+function emitChange() {
+	emit('valueChanged', {
+		name: props.path,
+		value: state.paramValue,
+		node: props.node?.name as string,
+	});
+}
+
+const debouncedEmitChange = debounce(emitChange, { debounceTime: 1000 });
 
 function addCondition(): void {
 	state.paramValue.conditions.push(createCondition());
+	debouncedEmitChange();
 }
 
 function onConditionUpdate(index: number, value: FilterConditionValue): void {
 	state.paramValue.conditions[index] = value;
+	debouncedEmitChange();
 }
 
 function onCombinatorChange(combinator: FilterTypeCombinator): void {
 	state.paramValue.combinator = combinator;
+	debouncedEmitChange();
 }
 
 function onConditionRemove(index: number): void {
 	state.paramValue.conditions.splice(index, 1);
+	debouncedEmitChange();
 }
 
 function getIssues(index: number): string[] {
@@ -137,6 +155,7 @@ function getIssues(index: number): string[] {
 			:underline="true"
 			:show-options="true"
 			:show-expression-selector="false"
+			size="small"
 			color="text-dark"
 		>
 		</n8n-input-label>
@@ -145,11 +164,11 @@ function getIssues(index: number): string[] {
 				<div v-for="(condition, index) of state.paramValue.conditions" :key="condition.id">
 					<CombinatorSelect
 						v-if="index !== 0"
-						:read-only="index !== 1"
+						:read-only="index !== 1 || readOnly"
 						:options="allowedCombinators"
 						:selected="state.paramValue.combinator"
 						:class="$style.combinator"
-						@combinatorChange="onCombinatorChange"
+						@combinator-change="onCombinatorChange"
 					/>
 
 					<Condition
@@ -157,6 +176,7 @@ function getIssues(index: number): string[] {
 						:index="index"
 						:options="state.paramValue.options"
 						:fixed-left-value="!!parameter.typeOptions?.filter?.leftValue"
+						:read-only="readOnly"
 						:can-remove="index !== 0 || state.paramValue.conditions.length > 1"
 						:path="`${path}.${index}`"
 						:issues="getIssues(index)"
@@ -166,7 +186,7 @@ function getIssues(index: number): string[] {
 					></Condition>
 				</div>
 			</div>
-			<div v-if="!singleCondition" :class="$style.addConditionWrapper">
+			<div v-if="!singleCondition && !readOnly" :class="$style.addConditionWrapper">
 				<n8n-button
 					type="tertiary"
 					block

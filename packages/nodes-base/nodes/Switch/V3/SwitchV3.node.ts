@@ -10,6 +10,7 @@ import type {
 	INodeTypeDescription,
 } from 'n8n-workflow';
 import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
+import set from 'lodash/set';
 import { capitalize } from '@utils/utilities';
 
 const configuredOutputs = (parameters: INodeParameters) => {
@@ -100,7 +101,7 @@ export class SwitchV3 implements INodeType {
 					// eslint-disable-next-line n8n-nodes-base/node-param-default-wrong-for-number
 					default: '={{}}',
 					description:
-						"The output's index to which send an input item, use expressions to calculate what input item should be routed to which output, expression must return a number",
+						'The output index to send the input item to. Use an expression to calculate which input item should be routed to which output. The expression must return a number.',
 				},
 				{
 					displayName: 'Routing Rules',
@@ -349,8 +350,10 @@ export class SwitchV3 implements INodeType {
 						} catch (error) {
 							if (!options.looseTypeValidation) {
 								error.description =
-									"Try to change the operator, switch ON the option 'Less Strict Type Validation', or change the type with an expression";
+									"Try changing the type of comparison. Alternatively you can enable 'Less Strict Type Validation' in the options.";
 							}
+							set(error, 'context.itemIndex', itemIndex);
+							set(error, 'node', this.getNode());
 							throw error;
 						}
 

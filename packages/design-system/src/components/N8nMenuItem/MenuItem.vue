@@ -40,135 +40,107 @@
 			:disabled="!compact"
 			:show-after="tooltipDelay"
 		>
-			<ElMenuItem
-				:id="item.id"
-				:class="{
-					[$style.menuItem]: true,
-					[$style.item]: true,
-					[$style.disableActiveStyle]: !isItemActive(item),
-					[$style.active]: isItemActive(item),
-					[$style.compact]: compact,
-				}"
-				data-test-id="menu-item"
-				:index="item.id"
-				@click="handleSelect(item)"
-			>
-				<N8nIcon
-					v-if="item.icon"
-					:class="$style.icon"
-					:icon="item.icon"
-					:size="item.customIconSize || 'large'"
-				/>
-				<span :class="$style.label">{{ item.label }}</span>
-				<N8nTooltip
-					v-if="item.secondaryIcon"
-					:class="$style.secondaryIcon"
-					:placement="item.secondaryIcon?.tooltip?.placement || 'right'"
-					:content="item.secondaryIcon?.tooltip?.content"
-					:disabled="compact || !item.secondaryIcon?.tooltip?.content"
-					:show-after="tooltipDelay"
+			<ConditionalRouterLink v-bind="item.route ?? item.link">
+				<ElMenuItem
+					:id="item.id"
+					:class="{
+						[$style.menuItem]: true,
+						[$style.item]: true,
+						[$style.disableActiveStyle]: !isItemActive(item),
+						[$style.active]: isItemActive(item),
+						[$style.compact]: compact,
+					}"
+					data-test-id="menu-item"
+					:index="item.id"
+					@click="handleSelect?.(item)"
 				>
-					<N8nIcon :icon="item.secondaryIcon.name" :size="item.secondaryIcon.size || 'small'" />
-				</N8nTooltip>
-			</ElMenuItem>
+					<N8nIcon
+						v-if="item.icon"
+						:class="$style.icon"
+						:icon="item.icon"
+						:size="item.customIconSize || 'large'"
+					/>
+					<span :class="$style.label">{{ item.label }}</span>
+					<N8nTooltip
+						v-if="item.secondaryIcon"
+						:placement="item.secondaryIcon?.tooltip?.placement || 'right'"
+						:content="item.secondaryIcon?.tooltip?.content"
+						:disabled="compact || !item.secondaryIcon?.tooltip?.content"
+						:show-after="tooltipDelay"
+					>
+						<N8nIcon
+							:class="$style.secondaryIcon"
+							:icon="item.secondaryIcon.name"
+							:size="item.secondaryIcon.size || 'small'"
+						/>
+					</N8nTooltip>
+				</ElMenuItem>
+			</ConditionalRouterLink>
 		</N8nTooltip>
 	</div>
 </template>
 
-<script lang="ts">
+<script lang="ts" setup>
+import { computed, useCssModule } from 'vue';
+import { useRoute } from 'vue-router';
 import { ElSubMenu, ElMenuItem } from 'element-plus';
 import N8nTooltip from '../N8nTooltip';
 import N8nIcon from '../N8nIcon';
-import type { PropType } from 'vue';
-import { defineComponent } from 'vue';
-import type { IMenuItem, RouteObject } from '../../types';
+import ConditionalRouterLink from '../ConditionalRouterLink';
+import type { IMenuItem } from '../../types';
+import { doesMenuItemMatchCurrentRoute } from './routerUtil';
 
-export default defineComponent({
-	name: 'N8nMenuItem',
-	components: {
-		ElSubMenu,
-		ElMenuItem,
-		N8nIcon,
-		N8nTooltip,
-	},
-	props: {
-		item: {
-			type: Object as PropType<IMenuItem>,
-			required: true,
-		},
-		compact: {
-			type: Boolean,
-			default: false,
-		},
-		tooltipDelay: {
-			type: Number,
-			default: 300,
-		},
-		popperClass: {
-			type: String,
-			default: '',
-		},
-		mode: {
-			type: String,
-			default: 'router',
-			validator: (value: string): boolean => ['router', 'tabs'].includes(value),
-		},
-		activeTab: {
-			type: String,
-		},
-		handleSelect: {
-			type: Function as PropType<(item: IMenuItem) => void>,
-		},
-	},
-	computed: {
-		availableChildren(): IMenuItem[] {
-			return Array.isArray(this.item.children)
-				? this.item.children.filter((child) => child.available !== false)
-				: [];
-		},
-		currentRoute(): RouteObject {
-			return (
-				(this as typeof this & { $route: RouteObject }).$route || {
-					name: '',
-					path: '',
-				}
-			);
-		},
-		submenuPopperClass(): string {
-			const popperClass = [this.$style.submenuPopper, this.popperClass];
-			if (this.compact) {
-				popperClass.push(this.$style.compact);
-			}
-			return popperClass.join(' ');
-		},
-	},
-	methods: {
-		isItemActive(item: IMenuItem): boolean {
-			const isItemActive = this.isActive(item);
-			const hasActiveChild =
-				Array.isArray(item.children) && item.children.some((child) => this.isActive(child));
-			return isItemActive || hasActiveChild;
-		},
-		isActive(item: IMenuItem): boolean {
-			if (this.mode === 'router') {
-				if (item.activateOnRoutePaths) {
-					return (
-						Array.isArray(item.activateOnRoutePaths) &&
-						item.activateOnRoutePaths.includes(this.currentRoute.path)
-					);
-				} else if (item.activateOnRouteNames) {
-					return (
-						Array.isArray(item.activateOnRouteNames) &&
-						item.activateOnRouteNames.includes(this.currentRoute.name || '')
-					);
-				}
-				return false;
-			} else {
-				return item.id === this.activeTab;
-			}
-		},
-	},
+interface MenuItemProps {
+	item: IMenuItem;
+	compact?: boolean;
+	tooltipDelay?: number;
+	popperClass?: string;
+	mode?: 'router' | 'tabs';
+	activeTab?: string;
+	handleSelect?: (item: IMenuItem) => void;
+}
+
+const props = withDefaults(defineProps<MenuItemProps>(), {
+	compact: false,
+	tooltipDelay: 300,
+	popperClass: '',
+	mode: 'router',
 });
+
+const $style = useCssModule();
+const $route = useRoute();
+
+const availableChildren = computed((): IMenuItem[] =>
+	Array.isArray(props.item.children)
+		? props.item.children.filter((child) => child.available !== false)
+		: [],
+);
+
+const currentRoute = computed(() => {
+	return $route ?? { name: '', path: '' };
+});
+
+const submenuPopperClass = computed((): string => {
+	const popperClass = [$style.submenuPopper, props.popperClass];
+	if (props.compact) {
+		popperClass.push($style.compact);
+	}
+	return popperClass.join(' ');
+});
+
+const isActive = (item: IMenuItem): boolean => {
+	if (props.mode === 'router') {
+		return doesMenuItemMatchCurrentRoute(item, currentRoute.value);
+	} else {
+		return item.id === props.activeTab;
+	}
+};
+
+const isItemActive = (item: IMenuItem): boolean => {
+	const hasActiveChild =
+		Array.isArray(item.children) && item.children.some((child) => isActive(child));
+	return isActive(item) || hasActiveChild;
+};
 </script>
 
 <style module lang="scss">
@@ -278,6 +250,7 @@ export default defineComponent({
 	align-items: center;
 	justify-content: flex-end;
 	flex: 1;
+	margin-left: 20px;
 }
 
 .label {

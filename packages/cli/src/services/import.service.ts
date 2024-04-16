@@ -4,16 +4,13 @@ import { type INode, type INodeCredentialsDetails } from 'n8n-workflow';
 
 import { Logger } from '@/Logger';
 import * as Db from '@/Db';
-import { CredentialsRepository } from '@/databases/repositories/credentials.repository';
-import { TagRepository } from '@/databases/repositories/tag.repository';
-import { SharedWorkflow } from '@/databases/entities/SharedWorkflow';
-import { RoleService } from '@/services/role.service';
+import { CredentialsRepository } from '@db/repositories/credentials.repository';
+import { TagRepository } from '@db/repositories/tag.repository';
+import { SharedWorkflow } from '@db/entities/SharedWorkflow';
 import { replaceInvalidCredentials } from '@/WorkflowHelpers';
-import { WorkflowEntity } from '@/databases/entities/WorkflowEntity';
-import { WorkflowTagMapping } from '@/databases/entities/WorkflowTagMapping';
-
-import type { TagEntity } from '@/databases/entities/TagEntity';
-import type { Role } from '@/databases/entities/Role';
+import { WorkflowEntity } from '@db/entities/WorkflowEntity';
+import { WorkflowTagMapping } from '@db/entities/WorkflowTagMapping';
+import type { TagEntity } from '@db/entities/TagEntity';
 import type { ICredentialsDb } from '@/Interfaces';
 
 @Service()
@@ -22,19 +19,15 @@ export class ImportService {
 
 	private dbTags: TagEntity[] = [];
 
-	private workflowOwnerRole: Role;
-
 	constructor(
 		private readonly logger: Logger,
 		private readonly credentialsRepository: CredentialsRepository,
 		private readonly tagRepository: TagRepository,
-		private readonly roleService: RoleService,
 	) {}
 
 	async initRecords() {
 		this.dbCredentials = await this.credentialsRepository.find();
 		this.dbTags = await this.tagRepository.find();
-		this.workflowOwnerRole = await this.roleService.findWorkflowOwnerRole();
 	}
 
 	async importWorkflows(workflows: WorkflowEntity[], userId: string) {
@@ -60,14 +53,18 @@ export class ImportService {
 					this.logger.info(`Deactivating workflow "${workflow.name}". Remember to activate later.`);
 				}
 
-				const upsertResult = await tx.upsert(WorkflowEntity, workflow, ['id']);
+				const exists = workflow.id ? await tx.existsBy(WorkflowEntity, { id: workflow.id }) : false;
 
+				const upsertResult = await tx.upsert(WorkflowEntity, workflow, ['id']);
 				const workflowId = upsertResult.identifiers.at(0)?.id as string;
 
-				await tx.upsert(SharedWorkflow, { workflowId, userId, roleId: this.workflowOwnerRole.id }, [
-					'workflowId',
-					'userId',
-				]);
+				// Create relationship if the workflow was inserted instead of updated.
+				if (!exists) {
+					await tx.upsert(SharedWorkflow, { workflowId, userId, role: 'workflow:owner' }, [
+						'workflowId',
+						'userId',
+					]);
+				}
 
 				if (!workflow.tags?.length) continue;
 

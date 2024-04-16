@@ -308,7 +308,7 @@ describe('Node Creator', () => {
 			nodeCreatorFeature.getters.getCategoryItem('Actions').click();
 			nodeCreatorFeature.getters.getCreatorItem('Create a credential').click();
 			NDVModal.actions.close();
-			WorkflowPage.actions.deleteNode('When clicking "Test Workflow"');
+			WorkflowPage.actions.deleteNode('When clicking "Test workflow"');
 			WorkflowPage.getters.canvasNodePlusEndpointByName('n8n').click();
 			nodeCreatorFeature.getters.searchBar().find('input').clear().type('n8n');
 			nodeCreatorFeature.getters.getCreatorItem('n8n').click();
@@ -485,7 +485,7 @@ describe('Node Creator', () => {
 
 		nodeCreatorFeature.getters.searchBar().find('input').clear().type('spreadsheet');
 		nodeCreatorFeature.getters.nodeItemName().first().should('have.text', 'Convert to File');
-		nodeCreatorFeature.getters.nodeItemName().eq(1).should('have.text', 'Extract From File');
+		nodeCreatorFeature.getters.nodeItemName().eq(1).should('have.text', 'Extract from File');
 		nodeCreatorFeature.getters.nodeItemName().eq(2).should('have.text', 'Google Sheets');
 
 		nodeCreatorFeature.getters.searchBar().find('input').clear().type('sheets');

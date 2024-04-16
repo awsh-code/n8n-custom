@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { getVisibleSelect } from '../utils';
 import { MANUAL_TRIGGER_NODE_DISPLAY_NAME } from '../constants';
 import { NDV, WorkflowPage } from '../pages';
+import { NodeCreator } from '../pages/features/node-creator';
 
 const workflowPage = new WorkflowPage();
 const ndv = new NDV();
@@ -55,6 +56,26 @@ describe('NDV', () => {
 		cy.shouldNotHaveConsoleErrors();
 	});
 
+	it('should disconect Switch outputs if rules order was changed', () => {
+		cy.createFixtureWorkflow('NDV-test-switch_reorder.json', `NDV test switch reorder`);
+		workflowPage.actions.zoomToFit();
+
+		workflowPage.actions.executeWorkflow();
+		workflowPage.actions.openNode('Merge');
+		ndv.getters.outputPanel().contains('2 items').should('exist');
+		cy.contains('span', 'first').should('exist');
+		ndv.getters.backToCanvas().click();
+
+		workflowPage.actions.openNode('Switch');
+		cy.get('.cm-line').realMouseMove(100, 100);
+		cy.get('.fa-angle-down').click();
+		ndv.getters.backToCanvas().click();
+		workflowPage.actions.executeWorkflow();
+		workflowPage.actions.openNode('Merge');
+		ndv.getters.outputPanel().contains('1 item').should('exist');
+		cy.contains('span', 'zero').should('exist');
+	});
+
 	it('should show correct validation state for resource locator params', () => {
 		workflowPage.actions.addNodeToCanvas('Typeform', true, true);
 		ndv.getters.container().should('be.visible');
@@ -71,10 +92,10 @@ describe('NDV', () => {
 		workflowPage.actions.addNodeToCanvas('Manual');
 		workflowPage.actions.addNodeToCanvas('Airtable', true, true, 'Search records');
 		ndv.getters.container().should('be.visible');
-		// cy.get('.has-issues').should('have.length', 0);
+		cy.get('.has-issues').should('have.length', 0);
 		ndv.getters.parameterInput('table').find('input').eq(1).focus().blur();
 		ndv.getters.parameterInput('base').find('input').eq(1).focus().blur();
-		cy.get('.has-issues').should('have.length', 0);
+		cy.get('.has-issues').should('have.length', 2);
 		ndv.getters.backToCanvas().click();
 		workflowPage.actions.openNode('Airtable');
 		cy.get('.has-issues').should('have.length', 2);
@@ -306,7 +327,7 @@ describe('NDV', () => {
 
 		ndv.getters.parameterInput('remoteOptions').click();
 
-		ndv.getters.parameterInputIssues('remoteOptions').realHover();
+		ndv.getters.parameterInputIssues('remoteOptions').realHover({ scrollBehavior: false });
 		// Remote options dropdown should not be visible
 		ndv.getters.parameterInput('remoteOptions').find('.el-select').should('not.exist');
 	});
@@ -365,6 +386,8 @@ describe('NDV', () => {
 		ndv.actions.openCodeEditorFullscreen();
 
 		ndv.getters.codeEditorFullscreen().type('{selectall}').type('{backspace}').type('foo()');
+		ndv.getters.codeEditorFullscreen().should('contain.text', 'foo()');
+		cy.wait(200);
 		ndv.getters.codeEditorDialog().find('.el-dialog__close').click();
 		ndv.getters.parameterInput('jsCode').get('.cm-content').should('contain.text', 'foo()');
 	});
@@ -384,14 +407,12 @@ describe('NDV', () => {
 		) {
 			return cy.get(`[data-node-placement=${position}]`);
 		}
-		beforeEach(() => {
+
+		it('should traverse floating nodes with mouse', () => {
 			cy.createFixtureWorkflow('Floating_Nodes.json', `Floating Nodes`);
 			workflowPage.getters.canvasNodes().first().dblclick();
 			getFloatingNodeByPosition('inputMain').should('not.exist');
 			getFloatingNodeByPosition('outputMain').should('exist');
-		});
-
-		it('should traverse floating nodes with mouse', () => {
 			// Traverse 4 connected node forwards
 			Array.from(Array(4).keys()).forEach((i) => {
 				getFloatingNodeByPosition('outputMain').click({ force: true });
@@ -408,19 +429,6 @@ describe('NDV', () => {
 			});
 
 			getFloatingNodeByPosition('outputMain').click({ force: true });
-			ndv.getters.nodeNameContainer().should('contain', 'Chain');
-			getFloatingNodeByPosition('inputSub').should('exist');
-			getFloatingNodeByPosition('inputSub').click({ force: true });
-			ndv.getters.nodeNameContainer().should('contain', 'Model');
-			getFloatingNodeByPosition('inputSub').should('not.exist');
-			getFloatingNodeByPosition('inputMain').should('not.exist');
-			getFloatingNodeByPosition('outputMain').should('not.exist');
-			getFloatingNodeByPosition('outputSub').should('exist');
-			ndv.actions.close();
-			workflowPage.getters.selectedNodes().should('have.length', 1);
-			workflowPage.getters.selectedNodes().first().should('contain', 'Model');
-			workflowPage.getters.selectedNodes().first().dblclick();
-			getFloatingNodeByPosition('outputSub').click({ force: true });
 			ndv.getters.nodeNameContainer().should('contain', 'Chain');
 
 			// Traverse 4 connected node backwards
@@ -446,7 +454,11 @@ describe('NDV', () => {
 				.should('contain', MANUAL_TRIGGER_NODE_DISPLAY_NAME);
 		});
 
-		it('should traverse floating nodes with mouse', () => {
+		it('should traverse floating nodes with keyboard', () => {
+			cy.createFixtureWorkflow('Floating_Nodes.json', `Floating Nodes`);
+			workflowPage.getters.canvasNodes().first().dblclick();
+			getFloatingNodeByPosition('inputMain').should('not.exist');
+			getFloatingNodeByPosition('outputMain').should('exist');
 			// Traverse 4 connected node forwards
 			Array.from(Array(4).keys()).forEach((i) => {
 				cy.realPress(['ShiftLeft', 'Meta', 'AltLeft', 'ArrowRight']);
@@ -463,19 +475,6 @@ describe('NDV', () => {
 			});
 
 			cy.realPress(['ShiftLeft', 'Meta', 'AltLeft', 'ArrowRight']);
-			ndv.getters.nodeNameContainer().should('contain', 'Chain');
-			getFloatingNodeByPosition('inputSub').should('exist');
-			cy.realPress(['ShiftLeft', 'Meta', 'AltLeft', 'ArrowDown']);
-			ndv.getters.nodeNameContainer().should('contain', 'Model');
-			getFloatingNodeByPosition('inputSub').should('not.exist');
-			getFloatingNodeByPosition('inputMain').should('not.exist');
-			getFloatingNodeByPosition('outputMain').should('not.exist');
-			getFloatingNodeByPosition('outputSub').should('exist');
-			ndv.actions.close();
-			workflowPage.getters.selectedNodes().should('have.length', 1);
-			workflowPage.getters.selectedNodes().first().should('contain', 'Model');
-			workflowPage.getters.selectedNodes().first().dblclick();
-			cy.realPress(['ShiftLeft', 'Meta', 'AltLeft', 'ArrowUp']);
 			ndv.getters.nodeNameContainer().should('contain', 'Chain');
 
 			// Traverse 4 connected node backwards
@@ -500,6 +499,50 @@ describe('NDV', () => {
 				.first()
 				.should('contain', MANUAL_TRIGGER_NODE_DISPLAY_NAME);
 		});
+
+		it('should connect floating sub-nodes', () => {
+			const nodeCreator = new NodeCreator();
+			const connectionGroups = [
+				{
+					title: 'Language Models',
+					id: 'ai_languageModel',
+				},
+				{
+					title: 'Tools',
+					id: 'ai_tool',
+				},
+			];
+
+			workflowPage.actions.addInitialNodeToCanvas('AI Agent', { keepNdvOpen: true });
+
+			connectionGroups.forEach((group) => {
+				cy.getByTestId(`add-subnode-${group.id}`).should('exist');
+				cy.getByTestId(`add-subnode-${group.id}`).click();
+
+				cy.getByTestId('nodes-list-header').contains(group.title).should('exist');
+				nodeCreator.getters.getNthCreatorItem(1).click();
+				getFloatingNodeByPosition('outputSub').should('exist');
+				getFloatingNodeByPosition('outputSub').click({ force: true });
+
+				if (group.id === 'ai_languageModel') {
+					cy.getByTestId(`add-subnode-${group.id}`).should('not.exist');
+				} else {
+					cy.getByTestId(`add-subnode-${group.id}`).should('exist');
+					// Expand the subgroup
+					cy.getByTestId('subnode-connection-group-ai_tool').click();
+					cy.getByTestId(`add-subnode-${group.id}`).click();
+					nodeCreator.getters.getNthCreatorItem(1).click();
+					getFloatingNodeByPosition('outputSub').click({ force: true });
+					cy.getByTestId('subnode-connection-group-ai_tool')
+						.findChildByTestId('floating-subnode')
+						.should('have.length', 2);
+				}
+			});
+
+			// Since language model has no credentials set, it should show an error
+			// Sinse code tool require alphanumeric tool name it would also show an error(2 errors, 1 for each tool node)
+			cy.get('[class*=hasIssues]').should('have.length', 3);
+		});
 	});
 
 	it('should show node name and version in settings', () => {
@@ -507,12 +550,17 @@ describe('NDV', () => {
 
 		workflowPage.actions.openNode('Edit Fields (old)');
 		ndv.actions.openSettings();
-		ndv.getters.nodeVersion().should('have.text', 'Set node version 2 (Latest version: 3.2)');
+		ndv.getters.nodeVersion().should('have.text', 'Set node version 2 (Latest version: 3.3)');
 		ndv.actions.close();
 
 		workflowPage.actions.openNode('Edit Fields (latest)');
 		ndv.actions.openSettings();
-		ndv.getters.nodeVersion().should('have.text', 'Edit Fields (Set) node version 3.2 (Latest)');
+		ndv.getters.nodeVersion().should('have.text', 'Edit Fields (Set) node version 3.3 (Latest)');
+		ndv.actions.close();
+
+		workflowPage.actions.openNode('Edit Fields (no typeVersion)');
+		ndv.actions.openSettings();
+		ndv.getters.nodeVersion().should('have.text', 'Edit Fields (Set) node version 3.3 (Latest)');
 		ndv.actions.close();
 
 		workflowPage.actions.openNode('Function');
@@ -577,7 +625,7 @@ describe('NDV', () => {
 		ndv.getters.backToCanvas().click();
 		workflowPage.actions.executeWorkflow();
 		// Manual tigger node should show success indicator
-		workflowPage.actions.openNode('When clicking "Test Workflow"');
+		workflowPage.actions.openNode('When clicking "Test workflow"');
 		ndv.getters.nodeRunSuccessIndicator().should('exist');
 		// Code node should show error
 		ndv.getters.backToCanvas().click();
@@ -606,5 +654,45 @@ describe('NDV', () => {
 		ndv.actions.setRLCValue('documentId', TEST_DOC_ID);
 		ndv.actions.changeNodeOperation('Update Row');
 		ndv.getters.resourceLocatorInput('documentId').find('input').should('have.value', TEST_DOC_ID);
+	});
+
+	it('Should open appropriate node creator after clicking on connection hint link', () => {
+		const nodeCreator = new NodeCreator();
+		const hintMapper = {
+			Memory: 'AI Nodes',
+			'Output Parser': 'AI Nodes',
+			'Token Splitter': 'Document Loaders',
+			Tool: 'AI Nodes',
+			Embeddings: 'Vector Stores',
+			'Vector Store': 'Retrievers',
+		};
+		cy.createFixtureWorkflow(
+			'open_node_creator_for_connection.json',
+			`open_node_creator_for_connection ${uuid()}`,
+		);
+
+		Object.entries(hintMapper).forEach(([node, group]) => {
+			workflowPage.actions.openNode(node);
+			cy.get('[data-action=openSelectiveNodeCreator]').contains('Insert one').click();
+			nodeCreator.getters.activeSubcategory().should('contain', group);
+			cy.realPress('Escape');
+		});
+	});
+
+	it('Stop listening for trigger event from NDV', () => {
+		cy.intercept('POST', '/rest/workflows/run').as('workflowRun');
+		workflowPage.actions.addInitialNodeToCanvas('Local File Trigger', {
+			keepNdvOpen: true,
+			action: 'On Changes To A Specific File',
+			isTrigger: true,
+		});
+		ndv.getters.triggerPanelExecuteButton().should('exist');
+		ndv.getters.triggerPanelExecuteButton().realClick();
+		ndv.getters.triggerPanelExecuteButton().should('contain', 'Stop Listening');
+		ndv.getters.triggerPanelExecuteButton().realClick();
+		cy.wait('@workflowRun').then(() => {
+			ndv.getters.triggerPanelExecuteButton().should('contain', 'Test step');
+			workflowPage.getters.successToast().should('exist');
+		});
 	});
 });

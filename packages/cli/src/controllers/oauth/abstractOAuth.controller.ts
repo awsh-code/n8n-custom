@@ -61,14 +61,14 @@ export abstract class AbstractOAuthController {
 	}
 
 	protected async getAdditionalData(user: User) {
-		return WorkflowExecuteAdditionalData.getBase(user.id);
+		return await WorkflowExecuteAdditionalData.getBase(user.id);
 	}
 
 	protected async getDecryptedData(
 		credential: ICredentialsDb,
 		additionalData: IWorkflowExecuteAdditionalData,
 	) {
-		return this.credentialsHelper.getDecrypted(
+		return await this.credentialsHelper.getDecrypted(
 			additionalData,
 			credential,
 			credential.type,
@@ -95,7 +95,7 @@ export abstract class AbstractOAuthController {
 		credential: ICredentialsDb,
 		decryptedData: ICredentialDataDecryptedObject,
 	) {
-		const credentials = new Credentials(credential, credential.type, credential.nodesAccess);
+		const credentials = new Credentials(credential, credential.type);
 		credentials.setData(decryptedData);
 		await this.credentialsRepository.update(credential.id, {
 			...credentials.getDataToSave(),
@@ -105,6 +105,6 @@ export abstract class AbstractOAuthController {
 
 	/** Get a credential without user check */
 	protected async getCredentialWithoutUser(credentialId: string): Promise<ICredentialsDb | null> {
-		return this.credentialsRepository.findOneBy({ id: credentialId });
+		return await this.credentialsRepository.findOneBy({ id: credentialId });
 	}
 }

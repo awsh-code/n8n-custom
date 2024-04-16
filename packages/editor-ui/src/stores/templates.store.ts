@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { STORES } from '@/constants';
+import { STORES, TEMPLATES_URLS } from '@/constants';
 import type {
 	INodeUi,
 	ITemplatesCategory,
@@ -21,8 +21,11 @@ import {
 	getWorkflowTemplate,
 } from '@/api/templates';
 import { getFixedNodesList } from '@/utils/nodeViewUtils';
+import { useRootStore } from '@/stores/n8nRoot.store';
+import { useUsersStore } from './users.store';
+import { useWorkflowsStore } from './workflows.store';
 
-const TEMPLATES_PAGE_SIZE = 10;
+const TEMPLATES_PAGE_SIZE = 20;
 
 function getSearchKey(query: ITemplatesQuery): string {
 	return JSON.stringify([query.search || '', [...query.categories].sort()]);
@@ -32,13 +35,14 @@ export type TemplatesStore = ReturnType<typeof useTemplatesStore>;
 
 export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 	state: (): ITemplateState => ({
-		categories: {},
+		categories: [],
 		collections: {},
 		workflows: {},
 		collectionSearches: {},
 		workflowSearches: {},
 		currentSessionId: '',
 		previousSessionId: '',
+		currentN8nPath: `${window.location.protocol}//${window.location.host}${window.BASE_PATH}`,
 	}),
 	getters: {
 		allCategories(): ITemplatesCategory[] {
@@ -109,6 +113,55 @@ export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 				);
 			};
 		},
+		hasCustomTemplatesHost(): boolean {
+			const settingsStore = useSettingsStore();
+			return settingsStore.templatesHost !== TEMPLATES_URLS.DEFAULT_API_HOST;
+		},
+		/**
+		 * Constructs URLSearchParams object based on the default parameters for the template repository
+		 * and provided additional parameters
+		 */
+		websiteTemplateRepositoryParameters() {
+			const rootStore = useRootStore();
+			const userStore = useUsersStore();
+			const workflowsStore = useWorkflowsStore();
+			const defaultParameters: Record<string, string> = {
+				...TEMPLATES_URLS.UTM_QUERY,
+				utm_instance: this.currentN8nPath,
+				utm_n8n_version: rootStore.versionCli,
+				utm_awc: String(workflowsStore.activeWorkflows.length),
+			};
+			const userRole: string | undefined =
+				userStore.currentUserCloudInfo?.role ?? userStore.currentUser?.personalizationAnswers?.role;
+			if (userRole) {
+				defaultParameters.utm_user_role = userRole;
+			}
+			return (additionalParameters: Record<string, string> = {}) => {
+				return new URLSearchParams({
+					...defaultParameters,
+					...additionalParameters,
+				});
+			};
+		},
+		/**
+		 * Construct the URL for the template repository on the website
+		 * @returns {string}
+		 */
+		websiteTemplateRepositoryURL(): string {
+			return `${
+				TEMPLATES_URLS.BASE_WEBSITE_URL
+			}?${this.websiteTemplateRepositoryParameters().toString()}`;
+		},
+		/**
+		 * Construct the URL for the template category page on the website for a given category id
+		 */
+		getWebsiteCategoryURL() {
+			return (id: string) => {
+				return `${TEMPLATES_URLS.BASE_WEBSITE_URL}/?${this.websiteTemplateRepositoryParameters({
+					categories: id,
+				}).toString()}`;
+			};
+		},
 	},
 	actions: {
 		addCategories(categories: ITemplatesCategory[]): void {
@@ -151,7 +204,7 @@ export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 			collections: ITemplatesCollection[];
 			query: ITemplatesQuery;
 		}): void {
-			const collectionIds = data.collections.map((collection) => collection.id);
+			const collectionIds = data.collections.map((collection) => String(collection.id));
 			const searchKey = getSearchKey(data.query);
 
 			this.collectionSearches = {
@@ -175,6 +228,7 @@ export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 					[searchKey]: {
 						workflowIds: workflowIds as unknown as string[],
 						totalWorkflows: data.totalWorkflows,
+						categories: this.categories,
 					},
 				};
 
@@ -186,6 +240,7 @@ export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 				[searchKey]: {
 					workflowIds: [...cachedResults.workflowIds, ...workflowIds] as string[],
 					totalWorkflows: data.totalWorkflows,
+					categories: this.categories,
 				},
 			};
 		},
@@ -291,6 +346,7 @@ export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 		async getWorkflows(query: ITemplatesQuery): Promise<ITemplatesWorkflow[]> {
 			const cachedResults = this.getSearchedWorkflows(query);
 			if (cachedResults) {
+				this.categories = this.workflowSearches[getSearchKey(query)].categories ?? [];
 				return cachedResults;
 			}
 
@@ -300,7 +356,7 @@ export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 
 			const payload = await getWorkflows(
 				apiEndpoint,
-				{ ...query, skip: 0, limit: TEMPLATES_PAGE_SIZE },
+				{ ...query, page: 1, limit: TEMPLATES_PAGE_SIZE },
 				{ 'n8n-version': versionCli },
 			);
 
@@ -320,7 +376,7 @@ export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 			try {
 				const payload = await getWorkflows(apiEndpoint, {
 					...query,
-					skip: cachedResults.length,
+					page: cachedResults.length / TEMPLATES_PAGE_SIZE + 1,
 					limit: TEMPLATES_PAGE_SIZE,
 				});
 
@@ -338,7 +394,7 @@ export const useTemplatesStore = defineStore(STORES.TEMPLATES, {
 			const settingsStore = useSettingsStore();
 			const apiEndpoint: string = settingsStore.templatesHost;
 			const versionCli: string = settingsStore.versionCli;
-			return getWorkflowTemplate(apiEndpoint, templateId, { 'n8n-version': versionCli });
+			return await getWorkflowTemplate(apiEndpoint, templateId, { 'n8n-version': versionCli });
 		},
 
 		async getFixedWorkflowTemplate(templateId: string): Promise<IWorkflowTemplate | undefined> {

@@ -1,18 +1,15 @@
 import { Container, Service } from 'typedi';
-import { User } from '@db/entities/User';
 import type { IUserSettings } from 'n8n-workflow';
+import { ApplicationError, ErrorReporterProxy as ErrorReporter } from 'n8n-workflow';
+
+import { type AssignableRole, User } from '@db/entities/User';
 import { UserRepository } from '@db/repositories/user.repository';
 import type { PublicUser } from '@/Interfaces';
 import type { PostHogClient } from '@/posthog';
-import { type JwtPayload, JwtService } from './jwt.service';
-import { TokenExpiredError } from 'jsonwebtoken';
 import { Logger } from '@/Logger';
-import { createPasswordSha } from '@/auth/jwt';
 import { UserManagementMailer } from '@/UserManagement/email';
 import { InternalHooks } from '@/InternalHooks';
-import { RoleService } from '@/services/role.service';
 import { UrlService } from '@/services/url.service';
-import { ApplicationError, ErrorReporterProxy as ErrorReporter } from 'n8n-workflow';
 import type { UserRequest } from '@/requests';
 import { InternalServerError } from '@/errors/response-errors/internal-server.error';
 
@@ -21,14 +18,12 @@ export class UserService {
 	constructor(
 		private readonly logger: Logger,
 		private readonly userRepository: UserRepository,
-		private readonly jwtService: JwtService,
 		private readonly mailer: UserManagementMailer,
-		private readonly roleService: RoleService,
 		private readonly urlService: UrlService,
 	) {}
 
 	async update(userId: string, data: Partial<User>) {
-		return this.userRepository.update(userId, data);
+		return await this.userRepository.update(userId, data);
 	}
 
 	getManager() {
@@ -38,58 +33,7 @@ export class UserService {
 	async updateSettings(userId: string, newSettings: Partial<IUserSettings>) {
 		const { settings } = await this.userRepository.findOneOrFail({ where: { id: userId } });
 
-		return this.userRepository.update(userId, { settings: { ...settings, ...newSettings } });
-	}
-
-	generatePasswordResetToken(user: User, expiresIn = '20m') {
-		return this.jwtService.sign(
-			{ sub: user.id, passwordSha: createPasswordSha(user) },
-			{ expiresIn },
-		);
-	}
-
-	generatePasswordResetUrl(user: User) {
-		const instanceBaseUrl = this.urlService.getInstanceBaseUrl();
-		const url = new URL(`${instanceBaseUrl}/change-password`);
-
-		url.searchParams.append('token', this.generatePasswordResetToken(user));
-		url.searchParams.append('mfaEnabled', user.mfaEnabled.toString());
-
-		return url.toString();
-	}
-
-	async resolvePasswordResetToken(token: string): Promise<User | undefined> {
-		let decodedToken: JwtPayload & { passwordSha: string };
-		try {
-			decodedToken = this.jwtService.verify(token);
-		} catch (e) {
-			if (e instanceof TokenExpiredError) {
-				this.logger.debug('Reset password token expired', { token });
-			} else {
-				this.logger.debug('Error verifying token', { token });
-			}
-			return;
-		}
-
-		const user = await this.userRepository.findOne({
-			where: { id: decodedToken.sub },
-			relations: ['authIdentities', 'globalRole'],
-		});
-
-		if (!user) {
-			this.logger.debug(
-				'Request to resolve password token failed because no user was found for the provided user ID',
-				{ userId: decodedToken.sub, token },
-			);
-			return;
-		}
-
-		if (createPasswordSha(user) !== decodedToken.passwordSha) {
-			this.logger.debug('Password updated since this token was generated');
-			return;
-		}
-
-		return user;
+		return await this.userRepository.update(userId, { settings: { ...settings, ...newSettings } });
 	}
 
 	async toPublic(
@@ -156,17 +100,17 @@ export class UserService {
 			resolve(publicUser);
 		});
 
-		return Promise.race([fetchPromise, timeoutPromise]);
+		return await Promise.race([fetchPromise, timeoutPromise]);
 	}
 
 	private async sendEmails(
 		owner: User,
 		toInviteUsers: { [key: string]: string },
-		role: 'member' | 'admin',
+		role: AssignableRole,
 	) {
 		const domain = this.urlService.getInstanceBaseUrl();
 
-		return Promise.all(
+		return await Promise.all(
 			Object.entries(toInviteUsers).map(async ([email, id]) => {
 				const inviteAcceptUrl = `${domain}/signup?inviterId=${owner.id}&inviteeId=${id}`;
 				const invitedUser: UserRequest.InviteResponse = {
@@ -224,9 +168,7 @@ export class UserService {
 		);
 	}
 
-	async inviteUsers(owner: User, attributes: Array<{ email: string; role: 'member' | 'admin' }>) {
-		const memberRole = await this.roleService.findGlobalMemberRole();
-		const adminRole = await this.roleService.findGlobalAdminRole();
+	async inviteUsers(owner: User, attributes: Array<{ email: string; role: AssignableRole }>) {
 		const emails = attributes.map(({ email }) => email);
 
 		const existingUsers = await this.userRepository.findManyByEmail(emails);
@@ -246,18 +188,16 @@ export class UserService {
 		);
 
 		try {
-			await this.getManager().transaction(async (transactionManager) =>
-				Promise.all(
-					toCreateUsers.map(async ({ email, role }) => {
-						const newUser = Object.assign(new User(), {
-							email,
-							globalRole: role === 'member' ? memberRole : adminRole,
-						});
-						const savedUser = await transactionManager.save<User>(newUser);
-						createdUsers.set(email, savedUser.id);
-						return savedUser;
-					}),
-				),
+			await this.getManager().transaction(
+				async (transactionManager) =>
+					await Promise.all(
+						toCreateUsers.map(async ({ email, role }) => {
+							const newUser = transactionManager.create(User, { email, role });
+							const savedUser = await transactionManager.save<User>(newUser);
+							createdUsers.set(email, savedUser.id);
+							return savedUser;
+						}),
+					),
 			);
 		} catch (error) {
 			ErrorReporter.error(error);

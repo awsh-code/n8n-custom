@@ -55,9 +55,6 @@
 <script lang="ts">
 import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
-
-const SURVEY_VERSION = 'v4';
-
 import {
 	COMPANY_SIZE_100_499,
 	COMPANY_SIZE_1000_OR_MORE,
@@ -142,7 +139,6 @@ import {
 	REPORTED_SOURCE_OTHER_KEY,
 	VIEWS,
 } from '@/constants';
-import { workflowHelpers } from '@/mixins/workflowHelpers';
 import { useToast } from '@/composables/useToast';
 import Modal from '@/components/Modal.vue';
 import type { IFormInputs, IPersonalizationLatestVersion, IUser } from '@/Interface';
@@ -158,10 +154,11 @@ import { useExternalHooks } from '@/composables/useExternalHooks';
 import { useUsageStore } from '@/stores/usage.store';
 import { useMessage } from '@/composables/useMessage';
 
+const SURVEY_VERSION = 'v4';
+
 export default defineComponent({
 	name: 'PersonalizationModal',
 	components: { Modal },
-	mixins: [workflowHelpers],
 	props: {
 		teleported: {
 			type: Boolean,
@@ -188,6 +185,7 @@ export default defineComponent({
 			registerForEnterpriseTrial: false,
 			modalBus: createEventBus(),
 			formBus: createEventBus(),
+			domainBlocklist: [] as string[],
 		};
 	},
 	computed: {
@@ -203,7 +201,11 @@ export default defineComponent({
 			return this.usersStore.currentUser;
 		},
 		canRegisterForEnterpriseTrial() {
-			if (this.settingsStore.isCloudDeployment) {
+			if (
+				this.settingsStore.isCloudDeployment ||
+				this.domainBlocklist.length === 0 ||
+				!this.currentUser?.email
+			) {
 				return false;
 			}
 
@@ -211,20 +213,11 @@ export default defineComponent({
 				this.formValues[COMPANY_SIZE_KEY],
 			);
 
-			const emailParts = (this.currentUser?.email || '@').split('@');
+			const emailParts = this.currentUser.email.split('@');
 			const emailDomain = emailParts[emailParts.length - 1];
-			const emailDomainParts = emailDomain.split('.');
-			const isEmailEligible = ![
-				'gmail',
-				'yahoo',
-				'hotmail',
-				'aol',
-				'live',
-				'outlook',
-				'icloud',
-				'mail',
-				'email',
-			].find((provider) => emailDomainParts.includes(provider));
+			const isEmailEligible = !this.domainBlocklist.find(
+				(blocklistedDomain) => emailDomain === blocklistedDomain,
+			);
 
 			return isSizeEligible && isEmailEligible;
 		},
@@ -679,6 +672,9 @@ export default defineComponent({
 			return survey;
 		},
 	},
+	mounted() {
+		void this.loadDomainBlocklist();
+	},
 	methods: {
 		closeDialog() {
 			this.modalBus.emit('close');
@@ -687,6 +683,11 @@ export default defineComponent({
 			if (this.$route.name !== VIEWS.NEW_WORKFLOW) {
 				void this.$router.replace({ name: VIEWS.NEW_WORKFLOW });
 			}
+		},
+		async loadDomainBlocklist() {
+			try {
+				this.domainBlocklist = (await import('email-providers/common.json')).default;
+			} catch (error) {}
 		},
 		onSave() {
 			this.formBus.emit('submit');
@@ -725,6 +726,10 @@ export default defineComponent({
 				if (this.registerForEnterpriseTrial && this.canRegisterForEnterpriseTrial) {
 					await this.usageStore.requestEnterpriseLicenseTrial();
 					licenseRequestSucceeded = true;
+					this.$telemetry.track('User registered for self serve trial', {
+						email: this.usersStore.currentUser?.email,
+						instance_id: this.rootStore.instanceId,
+					});
 				}
 			} catch (e) {
 				this.showError(
@@ -756,29 +761,32 @@ export default defineComponent({
 				getAccountAge(this.usersStore.currentUser || ({} as IUser)) <= ONBOARDING_PROMPT_TIMEBOX
 			) {
 				const onboardingResponse = await this.uiStore.getNextOnboardingPrompt();
+
+				if (!onboardingResponse) {
+					return;
+				}
+
 				const promptTimeout =
 					onboardingResponse.toast_sequence_number === 1 ? FIRST_ONBOARDING_PROMPT_TIMEOUT : 1000;
 
-				if (onboardingResponse.title && onboardingResponse.description) {
-					setTimeout(async () => {
-						this.showToast({
-							type: 'info',
-							title: onboardingResponse.title,
-							message: onboardingResponse.description,
-							duration: 0,
-							customClass: 'clickable',
-							closeOnClick: true,
-							onClick: () => {
-								this.$telemetry.track('user clicked onboarding toast', {
-									seq_num: onboardingResponse.toast_sequence_number,
-									title: onboardingResponse.title,
-									description: onboardingResponse.description,
-								});
-								this.uiStore.openModal(ONBOARDING_CALL_SIGNUP_MODAL_KEY);
-							},
-						});
-					}, promptTimeout);
-				}
+				setTimeout(async () => {
+					this.showToast({
+						type: 'info',
+						title: onboardingResponse.title,
+						message: onboardingResponse.description,
+						duration: 0,
+						customClass: 'clickable',
+						closeOnClick: true,
+						onClick: () => {
+							this.$telemetry.track('user clicked onboarding toast', {
+								seq_num: onboardingResponse.toast_sequence_number,
+								title: onboardingResponse.title,
+								description: onboardingResponse.description,
+							});
+							this.uiStore.openModal(ONBOARDING_CALL_SIGNUP_MODAL_KEY);
+						},
+					});
+				}, promptTimeout);
 			}
 		},
 	},

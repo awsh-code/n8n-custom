@@ -10,14 +10,14 @@
 						v-model="autoRefresh"
 						class="mr-xl"
 						data-test-id="execution-auto-refresh-checkbox"
-						@update:modelValue="handleAutoRefreshToggle"
+						@update:model-value="handleAutoRefreshToggle"
 					>
 						{{ i18n.baseText('executionsList.autoRefresh') }}
 					</el-checkbox>
 					<ExecutionFilter
 						v-show="!isMounting"
 						:workflows="workflows"
-						@filterChanged="onFilterChanged"
+						@filter-changed="onFilterChanged"
 					/>
 				</div>
 			</div>
@@ -33,7 +33,7 @@
 				"
 				:model-value="allExistingSelected"
 				data-test-id="select-all-executions-checkbox"
-				@update:modelValue="handleCheckAllExistingChange"
+				@update:model-value="handleCheckAllExistingChange"
 			/>
 
 			<div v-if="isMounting">
@@ -50,7 +50,7 @@
 								:disabled="finishedExecutionsCount < 1"
 								label=""
 								data-test-id="select-visible-executions-checkbox"
-								@update:modelValue="handleCheckAllVisibleChange"
+								@update:model-value="handleCheckAllVisibleChange"
 							/>
 						</th>
 						<th>{{ i18n.baseText('executionsList.name') }}</th>
@@ -75,7 +75,7 @@
 								:model-value="selectedItems[execution.id] || allExistingSelected"
 								label=""
 								data-test-id="select-execution-checkbox"
-								@update:modelValue="handleCheckboxChanged(execution.id)"
+								@update:model-value="handleCheckboxChanged(execution.id)"
 							/>
 						</td>
 						<td>
@@ -301,7 +301,7 @@ import type {
 	ExecutionFilterType,
 	ExecutionsQueryFilter,
 } from '@/Interface';
-import type { IExecutionsSummary, ExecutionStatus } from 'n8n-workflow';
+import type { ExecutionSummary, ExecutionStatus } from 'n8n-workflow';
 import { range as _range } from 'lodash-es';
 import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
@@ -342,7 +342,7 @@ export default defineComponent({
 	data() {
 		return {
 			isMounting: true,
-			finishedExecutions: [] as IExecutionsSummary[],
+			finishedExecutions: [] as ExecutionSummary[],
 			finishedExecutionsCount: 0,
 			finishedExecutionsCountEstimated: false,
 
@@ -388,8 +388,8 @@ export default defineComponent({
 		activeExecutions(): IExecutionsCurrentSummaryExtended[] {
 			return this.workflowsStore.activeExecutions;
 		},
-		combinedExecutions(): IExecutionsSummary[] {
-			const returnData: IExecutionsSummary[] = [];
+		combinedExecutions(): ExecutionSummary[] {
+			const returnData: ExecutionSummary[] = [];
 
 			if (['all', 'running'].includes(this.filter.status)) {
 				returnData.push(...this.activeExecutions);
@@ -428,7 +428,7 @@ export default defineComponent({
 		closeDialog() {
 			this.$emit('closeModal');
 		},
-		displayExecution(execution: IExecutionsSummary) {
+		displayExecution(execution: ExecutionSummary) {
 			const route = this.$router.resolve({
 				name: VIEWS.EXECUTION_PREVIEW,
 				params: { name: execution.workflowId, executionId: execution.id },
@@ -529,7 +529,7 @@ export default defineComponent({
 			this.handleClearSelection();
 			this.isMounting = false;
 		},
-		async handleActionItemClick(commandData: { command: string; execution: IExecutionsSummary }) {
+		async handleActionItemClick(commandData: { command: string; execution: ExecutionSummary }) {
 			if (['currentlySaved', 'original'].includes(commandData.command)) {
 				let loadWorkflow = false;
 				if (commandData.command === 'currentlySaved') {
@@ -553,7 +553,7 @@ export default defineComponent({
 		},
 		async loadActiveExecutions(): Promise<void> {
 			const activeExecutions = isEmpty(this.workflowFilterCurrent.metadata)
-				? await this.workflowsStore.getCurrentExecutions(this.workflowFilterCurrent)
+				? await this.workflowsStore.getActiveExecutions(this.workflowFilterCurrent)
 				: [];
 			for (const activeExecution of activeExecutions) {
 				if (activeExecution.workflowId && !activeExecution.workflowName) {
@@ -573,7 +573,7 @@ export default defineComponent({
 			// ever get ids 500, 501, 502 and 503 when they finish
 			const promises = [this.workflowsStore.getPastExecutions(filter, this.requestItemsPerRequest)];
 			if (isEmpty(filter.metadata)) {
-				promises.push(this.workflowsStore.getCurrentExecutions({}));
+				promises.push(this.workflowsStore.getActiveExecutions({}));
 			}
 
 			const results = await Promise.all(promises);
@@ -747,7 +747,7 @@ export default defineComponent({
 				this.showError(error, this.i18n.baseText('executionsList.showError.loadWorkflows.title'));
 			}
 		},
-		async retryExecution(execution: IExecutionsSummary, loadWorkflow?: boolean) {
+		async retryExecution(execution: ExecutionSummary, loadWorkflow?: boolean) {
 			this.isDataLoading = true;
 
 			try {
@@ -786,7 +786,7 @@ export default defineComponent({
 
 			this.isDataLoading = false;
 		},
-		getStatus(execution: IExecutionsSummary): ExecutionStatus {
+		getStatus(execution: ExecutionSummary): ExecutionStatus {
 			if (execution.status) {
 				return execution.status;
 			} else {
@@ -799,17 +799,17 @@ export default defineComponent({
 				} else if (execution.finished) {
 					status = 'success';
 				} else if (execution.stoppedAt !== null) {
-					status = 'failed';
+					status = 'error';
 				} else {
 					status = 'unknown';
 				}
 				return status;
 			}
 		},
-		getRowClass(execution: IExecutionsSummary): string {
+		getRowClass(execution: ExecutionSummary): string {
 			return [this.$style.execRow, this.$style[this.getStatus(execution)]].join(' ');
 		},
-		getStatusText(entry: IExecutionsSummary): string {
+		getStatusText(entry: ExecutionSummary): string {
 			const status = this.getStatus(entry);
 			let text = '';
 
@@ -825,7 +825,7 @@ export default defineComponent({
 				text = this.i18n.baseText('executionsList.running');
 			} else if (status === 'success') {
 				text = this.i18n.baseText('executionsList.succeeded');
-			} else if (status === 'failed') {
+			} else if (status === 'error') {
 				text = this.i18n.baseText('executionsList.error');
 			} else {
 				text = this.i18n.baseText('executionsList.unknown');
@@ -833,7 +833,7 @@ export default defineComponent({
 
 			return text;
 		},
-		getStatusTextTranslationPath(entry: IExecutionsSummary): string {
+		getStatusTextTranslationPath(entry: ExecutionSummary): string {
 			const status = this.getStatus(entry);
 			let path = '';
 
@@ -841,7 +841,7 @@ export default defineComponent({
 				path = 'executionsList.statusWaiting';
 			} else if (status === 'canceled') {
 				path = 'executionsList.statusCanceled';
-			} else if (['crashed', 'failed', 'success'].includes(status)) {
+			} else if (['crashed', 'error', 'success'].includes(status)) {
 				if (!entry.stoppedAt) {
 					path = 'executionsList.statusTextWithoutTime';
 				} else {
@@ -857,7 +857,7 @@ export default defineComponent({
 
 			return path;
 		},
-		getStatusTooltipText(entry: IExecutionsSummary): string {
+		getStatusTooltipText(entry: ExecutionSummary): string {
 			const status = this.getStatus(entry);
 			let text = '';
 
@@ -894,16 +894,7 @@ export default defineComponent({
 				this.showError(error, this.i18n.baseText('executionsList.showError.stopExecution.title'));
 			}
 		},
-		isExecutionRetriable(execution: IExecutionsSummary): boolean {
-			return (
-				execution.stoppedAt !== undefined &&
-				!execution.finished &&
-				execution.retryOf === undefined &&
-				execution.retrySuccessId === undefined &&
-				!execution.waitTill
-			);
-		},
-		async deleteExecution(execution: IExecutionsSummary) {
+		async deleteExecution(execution: ExecutionSummary) {
 			this.isDataLoading = true;
 			try {
 				await this.workflowsStore.deleteExecutions({ ids: [execution.id] });
@@ -921,17 +912,17 @@ export default defineComponent({
 			}
 			this.isDataLoading = true;
 		},
-		isWaitTillIndefinite(execution: IExecutionsSummary): boolean {
+		isWaitTillIndefinite(execution: ExecutionSummary): boolean {
 			if (!execution.waitTill) {
 				return false;
 			}
 			return new Date(execution.waitTill).toISOString() === WAIT_TIME_UNLIMITED;
 		},
-		isRunning(execution: IExecutionsSummary): boolean {
+		isRunning(execution: ExecutionSummary): boolean {
 			return this.getStatus(execution) === 'running';
 		},
 		selectAllVisibleExecutions() {
-			this.combinedExecutions.forEach((execution: IExecutionsSummary) => {
+			this.combinedExecutions.forEach((execution: ExecutionSummary) => {
 				this.selectedItems = { ...this.selectedItems, [execution.id]: true };
 			});
 		},
@@ -1032,7 +1023,7 @@ export default defineComponent({
 	font-weight: var(--font-weight-bold);
 
 	.crashed &,
-	.failed & {
+	.error & {
 		color: var(--color-danger);
 	}
 
@@ -1143,7 +1134,7 @@ export default defineComponent({
 		}
 
 		&.crashed td:first-child::before,
-		&.failed td:first-child::before {
+		&.error td:first-child::before {
 			background: var(--execution-card-border-error);
 		}
 
@@ -1160,6 +1151,7 @@ export default defineComponent({
 			background: var(--execution-card-border-waiting);
 		}
 
+		&.canceled td:first-child::before,
 		&.unknown td:first-child::before {
 			background: var(--execution-card-border-unknown);
 		}

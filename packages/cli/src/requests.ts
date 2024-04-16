@@ -2,26 +2,19 @@ import type express from 'express';
 import type {
 	BannerName,
 	ICredentialDataDecryptedObject,
-	ICredentialNodeAccess,
 	IDataObject,
 	INodeCredentialTestRequest,
 	INodeCredentials,
 	INodeParameters,
 	INodeTypeNameVersion,
 	IUser,
+	NodeError,
 } from 'n8n-workflow';
 
 import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, Length } from 'class-validator';
 import { NoXss } from '@db/utils/customValidators';
-import type {
-	PublicUser,
-	IExecutionDeleteFilter,
-	SecretsProvider,
-	SecretsProviderState,
-} from '@/Interfaces';
-import type { Role, RoleNames } from '@db/entities/Role';
-import type { User } from '@db/entities/User';
-import type { UserManagementMailer } from '@/UserManagement/email';
+import type { PublicUser, SecretsProvider, SecretsProviderState } from '@/Interfaces';
+import { AssignableRole, type User } from '@db/entities/User';
 import type { Variables } from '@db/entities/Variables';
 import type { WorkflowEntity } from '@db/entities/WorkflowEntity';
 import type { CredentialsEntity } from '@db/entities/CredentialsEntity';
@@ -53,26 +46,36 @@ export class UserSettingsUpdatePayload {
 }
 
 export class UserRoleChangePayload {
-	@IsIn(['member', 'admin'])
-	newRoleName: Exclude<RoleNames, 'user' | 'editor' | 'owner'>;
+	@IsIn(['global:admin', 'global:member'])
+	newRoleName: AssignableRole;
 }
+
+export type APIRequest<
+	RouteParams = {},
+	ResponseBody = {},
+	RequestBody = {},
+	RequestQuery = {},
+> = express.Request<RouteParams, ResponseBody, RequestBody, RequestQuery> & {
+	browserId?: string;
+};
 
 export type AuthlessRequest<
 	RouteParams = {},
 	ResponseBody = {},
 	RequestBody = {},
 	RequestQuery = {},
-> = express.Request<RouteParams, ResponseBody, RequestBody, RequestQuery>;
+> = APIRequest<RouteParams, ResponseBody, RequestBody, RequestQuery> & {
+	user: never;
+};
 
 export type AuthenticatedRequest<
 	RouteParams = {},
 	ResponseBody = {},
 	RequestBody = {},
 	RequestQuery = {},
-> = Omit<express.Request<RouteParams, ResponseBody, RequestBody, RequestQuery>, 'user'> & {
+> = Omit<APIRequest<RouteParams, ResponseBody, RequestBody, RequestQuery>, 'user' | 'cookies'> & {
 	user: User;
-	mailer?: UserManagementMailer;
-	globalMemberRole?: Role;
+	cookies: Record<string, string | undefined>;
 };
 
 // ----------------------------------
@@ -142,6 +145,18 @@ export function hasSharing(
 }
 
 // ----------------------------------
+//          /ai
+// ----------------------------------
+
+export declare namespace AIRequest {
+	export type DebugError = AuthenticatedRequest<{}, {}, AIDebugErrorPayload>;
+}
+
+export interface AIDebugErrorPayload {
+	error: NodeError;
+}
+
+// ----------------------------------
 //          /credentials
 // ----------------------------------
 
@@ -150,7 +165,6 @@ export declare namespace CredentialRequest {
 		id: string; // delete if sent
 		name: string;
 		type: string;
-		nodesAccess: ICredentialNodeAccess[];
 		data: ICredentialDataDecryptedObject;
 	}>;
 
@@ -168,33 +182,7 @@ export declare namespace CredentialRequest {
 
 	type Test = AuthenticatedRequest<{}, {}, INodeCredentialTestRequest>;
 
-	type Share = AuthenticatedRequest<{ credentialId: string }, {}, { shareWithIds: string[] }>;
-}
-
-// ----------------------------------
-//           /executions
-// ----------------------------------
-
-export declare namespace ExecutionRequest {
-	namespace QueryParam {
-		type GetAll = {
-			filter: string; // '{ waitTill: string; finished: boolean, [other: string]: string }'
-			limit: string;
-			lastId: string;
-			firstId: string;
-		};
-
-		type GetAllCurrent = {
-			filter: string; // '{ workflowId: string }'
-		};
-	}
-
-	type GetAll = AuthenticatedRequest<{}, {}, {}, QueryParam.GetAll>;
-	type Get = AuthenticatedRequest<{ id: string }, {}, {}, { unflattedResponse: 'true' | 'false' }>;
-	type Delete = AuthenticatedRequest<{}, {}, IExecutionDeleteFilter>;
-	type Retry = AuthenticatedRequest<{ id: string }, {}, { loadWorkflow: boolean }, {}>;
-	type Stop = AuthenticatedRequest<{ id: string }>;
-	type GetAllCurrent = AuthenticatedRequest<{}, {}, {}, QueryParam.GetAllCurrent>;
+	type Share = AuthenticatedRequest<{ id: string }, {}, { shareWithIds: string[] }>;
 }
 
 // ----------------------------------
@@ -256,7 +244,7 @@ export declare namespace UserRequest {
 	export type Invite = AuthenticatedRequest<
 		{},
 		{},
-		Array<{ email: string; role?: 'member' | 'admin' }>
+		Array<{ email: string; role?: AssignableRole }>
 	>;
 
 	export type InviteResponse = {

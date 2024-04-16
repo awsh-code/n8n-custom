@@ -115,12 +115,12 @@ export abstract class AbstractServer {
 
 	private async setupHealthCheck() {
 		// health check should not care about DB connections
-		this.app.get('/healthz', async (req, res) => {
+		this.app.get('/healthz', async (_req, res) => {
 			res.send({ status: 'ok' });
 		});
 
 		const { connectionState } = Db;
-		this.app.use((req, res, next) => {
+		this.app.use((_req, res, next) => {
 			if (connectionState.connected) {
 				if (connectionState.migrated) next();
 				else res.send('n8n is starting up. Please wait');
@@ -208,7 +208,7 @@ export abstract class AbstractServer {
 			// TODO UM: check if this needs validation with user management.
 			this.app.delete(
 				`/${this.restEndpoint}/test-webhook/:id`,
-				send(async (req) => testWebhooks.cancelWebhook(req.params.id)),
+				send(async (req) => await testWebhooks.cancelWebhook(req.params.id)),
 			);
 		}
 

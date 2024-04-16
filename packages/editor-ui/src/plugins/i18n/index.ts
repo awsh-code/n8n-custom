@@ -357,7 +357,7 @@ export class I18nClass {
 		});
 	}
 
-	rootVars: Record<string, string | undefined> = {
+	rootVars = {
 		$binary: this.baseText('codeNodeEditor.completer.binary'),
 		$execution: this.baseText('codeNodeEditor.completer.$execution'),
 		$ifEmpty: this.baseText('codeNodeEditor.completer.$ifEmpty'),
@@ -375,7 +375,11 @@ export class I18nClass {
 		$today: this.baseText('codeNodeEditor.completer.$today'),
 		$vars: this.baseText('codeNodeEditor.completer.$vars'),
 		$workflow: this.baseText('codeNodeEditor.completer.$workflow'),
-	};
+		DateTime: this.baseText('codeNodeEditor.completer.dateTime'),
+		$request: this.baseText('codeNodeEditor.completer.$request'),
+		$response: this.baseText('codeNodeEditor.completer.$response'),
+		$pageCount: this.baseText('codeNodeEditor.completer.$pageCount'),
+	} as const satisfies Record<string, string | undefined>;
 
 	proxyVars: Record<string, string | undefined> = {
 		'$input.all': this.baseText('codeNodeEditor.completer.$input.all'),
@@ -390,6 +394,7 @@ export class I18nClass {
 		'$().itemMatching': this.baseText('codeNodeEditor.completer.selector.itemMatching'),
 		'$().last': this.baseText('codeNodeEditor.completer.selector.last'),
 		'$().params': this.baseText('codeNodeEditor.completer.selector.params'),
+		'$().isExecuted': this.baseText('codeNodeEditor.completer.selector.isExecuted'),
 
 		'$prevNode.name': this.baseText('codeNodeEditor.completer.$prevNode.name'),
 		'$prevNode.outputIndex': this.baseText('codeNodeEditor.completer.$prevNode.outputIndex'),
@@ -559,11 +564,11 @@ export async function loadLanguage(language?: string) {
 	if (!language) return;
 
 	if (i18nInstance.global.locale === language) {
-		return setLanguage(language);
+		return await setLanguage(language);
 	}
 
 	if (loadedLanguages.includes(language)) {
-		return setLanguage(language);
+		return await setLanguage(language);
 	}
 
 	const { numberFormats, ...rest } = (await import(`./locales/${language}.json`)).default;
@@ -576,7 +581,7 @@ export async function loadLanguage(language?: string) {
 
 	loadedLanguages.push(language);
 
-	return setLanguage(language);
+	return await setLanguage(language);
 }
 
 /**

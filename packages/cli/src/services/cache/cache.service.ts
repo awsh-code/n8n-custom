@@ -2,7 +2,7 @@ import EventEmitter from 'node:events';
 
 import { Service } from 'typedi';
 import { caching } from 'cache-manager';
-import { jsonStringify } from 'n8n-workflow';
+import { ApplicationError, jsonStringify } from 'n8n-workflow';
 
 import config from '@/config';
 import { getDefaultRedisClient, getRedisPrefix } from '@/services/redis/RedisServiceHelper';
@@ -15,6 +15,7 @@ import type {
 	MaybeHash,
 	Hash,
 } from '@/services/cache/cache.types';
+import { TIME } from '@/constants';
 
 @Service()
 export class CacheService extends EventEmitter {
@@ -128,6 +129,20 @@ export class CacheService extends EventEmitter {
 		Object.assign(hashObject, hash);
 
 		await this.set(key, hashObject);
+	}
+
+	async expire(key: string, ttlMs: number) {
+		if (!this.cache) await this.init();
+
+		if (!key?.length) return;
+
+		if (this.cache.kind === 'memory') {
+			throw new ApplicationError('Method `expire` not yet implemented for in-memory cache', {
+				level: 'warning',
+			});
+		}
+
+		await this.cache.store.expire(key, ttlMs / TIME.SECOND);
 	}
 
 	// ----------------------------------
@@ -316,7 +331,7 @@ export class CacheService extends EventEmitter {
 
 		if (keys.length === 0) return;
 
-		return this.cache.store.mdel(...keys);
+		return await this.cache.store.mdel(...keys);
 	}
 
 	/**

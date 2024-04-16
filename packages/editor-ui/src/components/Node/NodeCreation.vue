@@ -19,7 +19,7 @@ type Props = {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const NodeCreator = defineAsyncComponent(
-	async () => import('@/components/Node/NodeCreator/NodeCreator.vue'),
+	async () => await import('@/components/Node/NodeCreator/NodeCreator.vue'),
 );
 
 const props = withDefaults(defineProps<Props>(), {
@@ -137,8 +137,8 @@ function nodeTypeSelected(nodeTypes: string[]) {
 		<Suspense>
 			<NodeCreator
 				:active="createNodeActive"
-				@nodeTypeSelected="nodeTypeSelected"
-				@closeNodeCreator="closeNodeCreator"
+				@node-type-selected="nodeTypeSelected"
+				@close-node-creator="closeNodeCreator"
 			/>
 		</Suspense>
 	</div>

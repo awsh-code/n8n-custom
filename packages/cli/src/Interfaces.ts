@@ -18,11 +18,12 @@ import type {
 	Workflow,
 	WorkflowExecuteMode,
 	ExecutionStatus,
-	IExecutionsSummary,
+	ExecutionSummary,
 	FeatureFlags,
 	INodeProperties,
 	IUserSettings,
 	IHttpRequestMethods,
+	StartNodeData,
 } from 'n8n-workflow';
 
 import type { ActiveWorkflowRunner } from '@/ActiveWorkflowRunner';
@@ -31,14 +32,10 @@ import type { WorkflowExecute } from 'n8n-core';
 
 import type PCancelable from 'p-cancelable';
 
-import type { ChildProcess } from 'child_process';
-
-import type { DatabaseType } from '@db/types';
 import type { AuthProviderType } from '@db/entities/AuthIdentity';
-import type { Role } from '@db/entities/Role';
 import type { SharedCredentials } from '@db/entities/SharedCredentials';
 import type { TagEntity } from '@db/entities/TagEntity';
-import type { User } from '@db/entities/User';
+import type { GlobalRole, User } from '@db/entities/User';
 import type { CredentialsRepository } from '@db/repositories/credentials.repository';
 import type { SettingsRepository } from '@db/repositories/settings.repository';
 import type { UserRepository } from '@db/repositories/user.repository';
@@ -81,7 +78,6 @@ export type ITagWithCountDb = Pick<TagEntity, 'id' | 'name' | 'createdAt' | 'upd
 
 // Almost identical to editor-ui.Interfaces.ts
 export interface IWorkflowDb extends IWorkflowBase {
-	id: string;
 	tags?: TagEntity[];
 }
 
@@ -119,18 +115,18 @@ export interface IExecutionBase {
 	mode: WorkflowExecuteMode;
 	startedAt: Date;
 	stoppedAt?: Date; // empty value means execution is still running
-	workflowId?: string; // To be able to filter executions easily //
+	workflowId: string;
 	finished: boolean;
 	retryOf?: string; // If it is a retry, the id of the execution it is a retry of.
 	retrySuccessId?: string; // If it failed and a retry did succeed. The id of the successful retry.
 	status: ExecutionStatus;
+	waitTill?: Date | null;
 }
 
 // Data in regular format with references
 export interface IExecutionDb extends IExecutionBase {
 	data: IRunExecutionData;
-	waitTill?: Date | null;
-	workflowData?: IWorkflowBase;
+	workflowData: IWorkflowBase;
 }
 
 /**
@@ -148,7 +144,6 @@ export interface IExecutionResponse extends IExecutionBase {
 	data: IRunExecutionData;
 	retryOf?: string;
 	retrySuccessId?: string;
-	waitTill?: Date | null;
 	workflowData: IWorkflowBase | WorkflowWithSharingsAndCredentials;
 }
 
@@ -162,9 +157,7 @@ export interface IExecutionFlatted extends IExecutionBase {
 export interface IExecutionFlattedDb extends IExecutionBase {
 	id: string;
 	data: string;
-	waitTill?: Date | null;
 	workflowData: Omit<IWorkflowBase, 'pinData'>;
-	status: ExecutionStatus;
 }
 
 export interface IExecutionFlattedResponse extends IExecutionFlatted {
@@ -174,8 +167,7 @@ export interface IExecutionFlattedResponse extends IExecutionFlatted {
 
 export interface IExecutionsListResponse {
 	count: number;
-	// results: IExecutionShortResponse[];
-	results: IExecutionsSummary[];
+	results: ExecutionSummary[];
 	estimated: boolean;
 }
 
@@ -196,15 +188,8 @@ export interface IExecutionsCurrentSummary {
 	status?: ExecutionStatus;
 }
 
-export interface IExecutionDeleteFilter {
-	deleteBefore?: Date;
-	filters?: IDataObject;
-	ids?: string[];
-}
-
 export interface IExecutingWorkflowData {
 	executionData: IWorkflowExecutionDataProcess;
-	process?: ChildProcess;
 	startedAt: Date;
 	postExecutePromises: Array<IDeferredPromise<IRun | undefined>>;
 	responsePromise?: IDeferredPromise<IExecuteResponsePromiseData>;
@@ -280,37 +265,6 @@ export interface IWebhookManager {
 	) => Promise<WebhookAccessControlOptions | undefined>;
 
 	executeWebhook(req: WebhookRequest, res: Response): Promise<IResponseCallbackData>;
-}
-
-export interface IDiagnosticInfo {
-	versionCli: string;
-	databaseType: DatabaseType;
-	notificationsEnabled: boolean;
-	disableProductionWebhooksOnMainProcess: boolean;
-	systemInfo: {
-		os: {
-			type?: string;
-			version?: string;
-		};
-		memory?: number;
-		cpus: {
-			count?: number;
-			model?: string;
-			speed?: number;
-		};
-	};
-	executionVariables: {
-		[key: string]: string | number | boolean | undefined;
-	};
-	deploymentType: string;
-	binaryDataMode: string;
-	smtp_set_up: boolean;
-	ldap_allowed: boolean;
-	saml_enabled: boolean;
-	binary_data_s3: boolean;
-	multi_main_setup_enabled: boolean;
-	licensePlanName?: string;
-	licenseTenantId?: number;
 }
 
 export interface ITelemetryUserDeletionData {
@@ -570,11 +524,6 @@ export interface IWorkflowErrorData {
 	};
 }
 
-export interface IProcessMessageDataHook {
-	hook: string;
-	parameters: any[];
-}
-
 export interface IWorkflowExecutionDataProcess {
 	destinationNode?: string;
 	restartExecutionId?: string;
@@ -583,14 +532,9 @@ export interface IWorkflowExecutionDataProcess {
 	runData?: IRunData;
 	pinData?: IPinData;
 	retryOf?: string;
-	sessionId?: string;
-	startNodes?: string[];
+	pushRef?: string;
+	startNodes?: StartNodeData[];
 	workflowData: IWorkflowBase;
-	userId: string;
-}
-
-export interface IWorkflowExecutionDataProcessWithExecution extends IWorkflowExecutionDataProcess {
-	executionId: string;
 	userId: string;
 }
 
@@ -669,17 +613,6 @@ export interface ILicensePostResponse extends ILicenseReadResponse {
 	managementToken: string;
 }
 
-export interface JwtToken {
-	token: string;
-	expiresIn: number;
-}
-
-export interface JwtPayload {
-	id: string;
-	email: string | null;
-	password: string | null;
-}
-
 export interface PublicUser {
 	id: string;
 	email?: string;
@@ -691,7 +624,7 @@ export interface PublicUser {
 	createdAt: Date;
 	isPending: boolean;
 	hasRecoveryCodesLeft: boolean;
-	globalRole?: Role;
+	role?: GlobalRole;
 	globalScopes?: Scope[];
 	signInType: AuthProviderType;
 	disabled: boolean;
@@ -736,7 +669,7 @@ export abstract class SecretsProvider {
 	abstract disconnect(): Promise<void>;
 	abstract update(): Promise<void>;
 	abstract test(): Promise<[boolean] | [boolean, string]>;
-	abstract getSecret(name: string): IDataObject | undefined;
+	abstract getSecret(name: string): unknown;
 	abstract hasSecret(name: string): boolean;
 	abstract getSecretNames(): string[];
 }

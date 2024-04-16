@@ -192,8 +192,8 @@ export async function execute(
 
 	const requestOptions = {
 		useStream: true,
-		resolveWithFullResponse: true,
-		encoding: null,
+		returnFullResponse: true,
+		encoding: 'arraybuffer',
 		json: false,
 	};
 
@@ -202,7 +202,7 @@ export async function execute(
 		'GET',
 		`/drive/v3/files/${fileId}`,
 		{},
-		{ fields: 'mimeType,name', supportsTeamDrives: true },
+		{ fields: 'mimeType,name', supportsTeamDrives: true, supportsAllDrives: true },
 	);
 	let response;
 
@@ -236,7 +236,7 @@ export async function execute(
 			'GET',
 			`/drive/v3/files/${fileId}/export`,
 			{},
-			{ mimeType: mime },
+			{ mimeType: mime, supportsAllDrives: true },
 			undefined,
 			requestOptions,
 		);
@@ -246,7 +246,7 @@ export async function execute(
 			'GET',
 			`/drive/v3/files/${fileId}`,
 			{},
-			{ alt: 'media' },
+			{ alt: 'media', supportsAllDrives: true },
 			undefined,
 			requestOptions,
 		);

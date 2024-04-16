@@ -2,7 +2,7 @@ import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { i18n as locale } from '@/plugins/i18n';
-import type { IExecutionsSummary } from 'n8n-workflow';
+import type { ExecutionSummary } from 'n8n-workflow';
 import { convertToDisplayDate } from '@/utils/formatters/dateFormatter';
 
 export interface IExecutionUIData {
@@ -24,15 +24,15 @@ export const executionHelpers = defineComponent({
 		currentWorkflow(): string {
 			return this.$route.params.name || this.workflowsStore.workflowId;
 		},
-		executions(): IExecutionsSummary[] {
+		executions(): ExecutionSummary[] {
 			return this.workflowsStore.currentWorkflowExecutions;
 		},
-		activeExecution(): IExecutionsSummary | null {
+		activeExecution(): ExecutionSummary | null {
 			return this.workflowsStore.activeWorkflowExecution;
 		},
 	},
 	methods: {
-		getExecutionUIDetails(execution: IExecutionsSummary): IExecutionUIData {
+		getExecutionUIDetails(execution: ExecutionSummary): IExecutionUIData {
 			const status = {
 				name: 'unknown',
 				startTime: this.formatDate(execution.startedAt),
@@ -51,7 +51,7 @@ export const executionHelpers = defineComponent({
 			} else if (execution.status === 'success') {
 				status.name = 'success';
 				status.label = this.$locale.baseText('executionsList.succeeded');
-			} else if (execution.status === 'failed' || execution.status === 'crashed') {
+			} else if (execution.status === 'error' || execution.status === 'crashed') {
 				status.name = 'error';
 				status.label = this.$locale.baseText('executionsList.error');
 			}
@@ -73,6 +73,13 @@ export const executionHelpers = defineComponent({
 		formatDate(fullDate: Date | string | number) {
 			const { date, time } = convertToDisplayDate(fullDate);
 			return locale.baseText('executionsList.started', { interpolate: { time, date } });
+		},
+		isExecutionRetriable(execution: ExecutionSummary): boolean {
+			return (
+				['crashed', 'error'].includes(execution.status ?? '') &&
+				!execution.retryOf &&
+				!execution.retrySuccessId
+			);
 		},
 	},
 });
