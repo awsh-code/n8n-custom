@@ -11,7 +11,7 @@ x-shared: &shared
     - DB_POSTGRESDB_USER=changeUser
     - DB_POSTGRESDB_PASSWORD=changePassword
     - NODE_FUNCTION_ALLOW_BUILTIN=*
-    - NODE_FUNCTION_ALLOW_EXTERNAL=axios,cheerio,express,firebase-admin,firebase-functions,firebase-tools,fs,googleapis,https,http,mysql,mysql2,pg,pg-hstore,redis,sequelize,sequelize-cli,sharp,sqlite3,uuid,vue
+    - NODE_FUNCTION_ALLOW_EXTERNAL=axios,cheerio,express,firebase-admin,firebase-functions,firebase-tools,fs,googleapis,https,http,mysql,mysql2,pg,pg-hstore,redis,sequelize,sequelize-cli,sharp,sqlite3,uuid,vue,puppeteer
   links:
     - postgres
     - redis
