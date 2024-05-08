@@ -17,6 +17,7 @@ x-shared: &shared
   links:
     - postgres
     - redis
+    - selenoid
   volumes:
     - n8n_storage:/home/node/.n8n
     - n8n_storage:/root/.n8n
@@ -46,6 +47,8 @@ services:
     build:
       context: ./docker/images/n8n-awsh/vendor/selenoid
       dockerfile: Dockerfile
+    networks:
+      - selenoid
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - selenoid_config:/etc/selenoid/
@@ -54,11 +57,13 @@ services:
     image: aerokube/selenoid-ui:latest
     ports:
       - "8080:8080"
+    networks:
+      - selenoid
     links:
       - selenoid
     environment:
       - SELENOID_URI=http://selenoid:4444
-    command: [ "--selenoid-uri", "http://selenoid:4444" ]
+    command: [ "--selenoid-uri", "http://selenoid:4444","-container-network","selenoid"]
 
   selenoid-chrome-setup:
     image: selenoid/chrome:124.0
