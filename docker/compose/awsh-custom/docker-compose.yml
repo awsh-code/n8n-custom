@@ -56,7 +56,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - selenoid_config:/etc/selenoid/
-    command: ["-container-network", "selenoid"]
+    command: ["-container-network", "selenoid","-limit","20","-session-attempt-timeout","3m","-service-startup-timeout","3m"]
 
   selenoid-ui:
     image: aerokube/selenoid-ui:latest
