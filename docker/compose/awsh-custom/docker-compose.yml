@@ -63,7 +63,7 @@ services:
       - selenoid
     environment:
       - SELENOID_URI=http://selenoid:4444
-    command: [ "--selenoid-uri", "http://selenoid:4444","-container-network","selenoid"]
+    command: [ "--selenoid-uri", "http://selenoid:4444","--container-network","selenoid"]
 
   selenoid-chrome-setup:
     image: selenoid/chrome:124.0
