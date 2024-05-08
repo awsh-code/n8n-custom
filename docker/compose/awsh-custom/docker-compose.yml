@@ -1,5 +1,9 @@
 version: '2.6.1'
 
+networks:
+  selenoid:
+    driver: bridge
+
 x-shared: &shared
   restart: always
   build:
@@ -63,7 +67,7 @@ services:
       - selenoid
     environment:
       - SELENOID_URI=http://selenoid:4444
-    command: [ "--selenoid-uri", "http://selenoid:4444","--container-network","selenoid"]
+      - CONTAINER_NETWORK=selenoid
 
   selenoid-chrome-setup:
     image: selenoid/chrome:124.0
