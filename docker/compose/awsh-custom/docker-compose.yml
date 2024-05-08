@@ -58,6 +58,8 @@ services:
       - selenoid
     environment:
       - SELENOID_URI=http://selenoid:4444
+    command: [ "--selenoid-uri", "http://selenoid:4444" ]
+
 
   n8n:
     <<: *shared
