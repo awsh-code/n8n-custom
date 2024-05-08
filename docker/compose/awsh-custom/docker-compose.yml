@@ -60,6 +60,10 @@ services:
       - SELENOID_URI=http://selenoid:4444
     command: [ "--selenoid-uri", "http://selenoid:4444" ]
 
+  selenoid-chrome-setup:
+    image: selenoid/chrome:124.0
+    command: /bin/true  # This command does nothing and exits immediately
+    restart: "no"  # Ensures the container does not restart
 
   n8n:
     <<: *shared
