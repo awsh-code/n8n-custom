@@ -3,7 +3,7 @@ version: '2.6.1'
 x-shared: &shared
   restart: always
   build:
-    context: ./docker/images/n8n-awsh
+    context: ./docker/images/n8n-awsh/vendor/n8n
     dockerfile: Dockerfile
   environment:
     - DB_TYPE=postgresdb
@@ -42,6 +42,13 @@ services:
     volumes:
       - redis_storage:/data
 
+  selenoid:
+    build:
+      context: ./docker/images/n8n-awsh/vendor/selenoid
+      dockerfile: Dockerfile
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - selenoid_config:/etc/selenoid/
   n8n:
     <<: *shared
     ports:
