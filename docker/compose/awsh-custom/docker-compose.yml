@@ -52,6 +52,8 @@ services:
 
   selenoid-ui:
     image: aerokube/selenoid-ui:latest
+    ports:
+      - "8080:8080"
     links:
       - selenoid
     environment:
