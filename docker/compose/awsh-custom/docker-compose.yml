@@ -49,6 +49,14 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - selenoid_config:/etc/selenoid/
+
+  selenoid-ui:
+    image: aerokube/selenoid-ui:latest
+    links:
+      - selenoid
+    environment:
+      - SELENOID_URI=http://selenoid:4444
+
   n8n:
     <<: *shared
     ports:
