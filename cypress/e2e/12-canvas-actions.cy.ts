@@ -1,5 +1,3 @@
-import { WorkflowPage as WorkflowPageClass } from '../pages/workflow';
-import { successToast } from '../pages/notifications';
 import {
 	MANUAL_TRIGGER_NODE_NAME,
 	MANUAL_TRIGGER_NODE_DISPLAY_NAME,
@@ -9,6 +7,8 @@ import {
 	IF_NODE_NAME,
 	HTTP_REQUEST_NODE_NAME,
 } from './../constants';
+import { successToast } from '../pages/notifications';
+import { WorkflowPage as WorkflowPageClass } from '../pages/workflow';
 
 const WorkflowPage = new WorkflowPageClass();
 describe('Canvas Actions', () => {
@@ -125,6 +125,8 @@ describe('Canvas Actions', () => {
 		WorkflowPage.actions.addNodeToCanvas(CODE_NODE_NAME);
 		WorkflowPage.actions.addNodeToCanvas(EDIT_FIELDS_SET_NODE_NAME);
 		WorkflowPage.actions.zoomToFit();
+		WorkflowPage.getters.canvasNodes().should('have.length', 3);
+		WorkflowPage.getters.nodeConnections().should('have.length', 2);
 		WorkflowPage.actions.addNodeBetweenNodes(
 			CODE_NODE_NAME,
 			EDIT_FIELDS_SET_NODE_NAME,
@@ -132,15 +134,27 @@ describe('Canvas Actions', () => {
 		);
 		WorkflowPage.getters.canvasNodes().should('have.length', 4);
 		WorkflowPage.getters.nodeConnections().should('have.length', 3);
-		// And last node should be pushed to the right
-		WorkflowPage.getters
-			.canvasNodes()
-			.last()
-			.should('have.css', 'left', '860px')
-			.should('have.css', 'top', '220px');
+
+		WorkflowPage.getters.canvasNodeByName(EDIT_FIELDS_SET_NODE_NAME).then(($editFieldsNode) => {
+			const editFieldsNodeLeft = parseFloat($editFieldsNode.css('left'));
+
+			WorkflowPage.getters.canvasNodeByName(HTTP_REQUEST_NODE_NAME).then(($httpNode) => {
+				const httpNodeLeft = parseFloat($httpNode.css('left'));
+				expect(httpNodeLeft).to.be.lessThan(editFieldsNodeLeft);
+			});
+		});
 	});
 
-	it('should delete connections by pressing the delete button', () => {
+	it('should delete node by pressing keyboard backspace', () => {
+		WorkflowPage.actions.addNodeToCanvas(MANUAL_TRIGGER_NODE_NAME);
+		WorkflowPage.getters.canvasNodeByName(MANUAL_TRIGGER_NODE_DISPLAY_NAME).click();
+		WorkflowPage.actions.addNodeToCanvas(CODE_NODE_NAME);
+		WorkflowPage.getters.canvasNodeByName(CODE_NODE_NAME).click();
+		cy.get('body').type('{backspace}');
+		WorkflowPage.getters.nodeConnections().should('have.length', 0);
+	});
+
+	it('should delete connections by clicking on the delete button', () => {
 		WorkflowPage.actions.addNodeToCanvas(MANUAL_TRIGGER_NODE_NAME);
 		WorkflowPage.getters.canvasNodeByName(MANUAL_TRIGGER_NODE_DISPLAY_NAME).click();
 		WorkflowPage.actions.addNodeToCanvas(CODE_NODE_NAME);

@@ -1,11 +1,13 @@
 import { mock } from 'jest-mock-extended';
-import type {
-	IDataObject,
-	INodeType,
-	INodeTypeData,
-	INodeTypes,
-	IVersionedNodeType,
-	LoadedClass,
+
+import {
+	NodeConnectionType,
+	type IDataObject,
+	type INodeType,
+	type INodeTypeData,
+	type INodeTypes,
+	type IVersionedNodeType,
+	type LoadedClass,
 } from '@/Interfaces';
 import * as NodeHelpers from '@/NodeHelpers';
 
@@ -60,8 +62,8 @@ const googleSheetsNode: LoadedClass<IVersionedNodeType> = {
 					defaults: {
 						name: 'Google Sheets',
 					},
-					inputs: ['main'],
-					outputs: ['main'],
+					inputs: [NodeConnectionType.Main],
+					outputs: [NodeConnectionType.Main],
 					credentials: [
 						{
 							name: 'googleApi',
@@ -286,9 +288,9 @@ const googleSheetsNode: LoadedClass<IVersionedNodeType> = {
 					displayName: 'Google Sheets',
 					group: ['input', 'output'],
 					icon: 'file:googleSheets.svg',
-					inputs: ['main'],
+					inputs: [NodeConnectionType.Main],
 					name: 'googleSheets',
-					outputs: ['main'],
+					outputs: [NodeConnectionType.Main],
 					properties: [
 						{
 							default: 'oAuth2',
@@ -551,8 +553,8 @@ const setNode: LoadedClass<INodeType> = {
 				name: 'Set',
 				color: '#0000FF',
 			},
-			inputs: ['main'],
-			outputs: ['main'],
+			inputs: [NodeConnectionType.Main],
+			outputs: [NodeConnectionType.Main],
 			properties: [
 				{
 					displayName: 'Value1',
@@ -565,6 +567,37 @@ const setNode: LoadedClass<INodeType> = {
 					name: 'value2',
 					type: 'string',
 					default: 'default-value2',
+				},
+			],
+		},
+	},
+};
+
+const manualTriggerNode: LoadedClass<INodeType> = {
+	sourcePath: '',
+	type: {
+		description: {
+			displayName: 'Manual Trigger',
+			name: 'n8n-nodes-base.manualTrigger',
+			icon: 'fa:mouse-pointer',
+			group: ['trigger'],
+			version: 1,
+			description: 'Runs the flow on clicking a button in n8n',
+			eventTriggerDescription: '',
+			maxNodes: 1,
+			defaults: {
+				name: 'When clicking ‘Test workflow’',
+				color: '#909298',
+			},
+			inputs: [],
+			outputs: [NodeConnectionType.Main],
+			properties: [
+				{
+					displayName:
+						'This node is where the workflow execution starts (when you click the ‘test’ button on the canvas).<br><br> <a data-action="showNodeCreator">Explore other ways to trigger your workflow</a> (e.g on a schedule, or a webhook)',
+					name: 'notice',
+					type: 'notice',
+					default: '',
 				},
 			],
 		},
@@ -590,8 +623,8 @@ export class NodeTypes implements INodeTypes {
 						name: 'Set Multi',
 						color: '#0000FF',
 					},
-					inputs: ['main'],
-					outputs: ['main'],
+					inputs: [NodeConnectionType.Main],
+					outputs: [NodeConnectionType.Main],
 					properties: [
 						{
 							displayName: 'Values',
@@ -628,6 +661,7 @@ export class NodeTypes implements INodeTypes {
 				},
 			},
 		},
+		'n8n-nodes-base.manualTrigger': manualTriggerNode,
 	};
 
 	getByName(nodeType: string): INodeType | IVersionedNodeType {

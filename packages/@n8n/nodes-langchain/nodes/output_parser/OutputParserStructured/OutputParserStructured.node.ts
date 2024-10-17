@@ -48,7 +48,7 @@ export class N8nStructuredOutputParser<T extends z.ZodTypeAny> extends Structure
 		sandboxedSchema: JavaScriptSandbox,
 		nodeVersion: number,
 	): Promise<StructuredOutputParser<z.ZodType<object, z.ZodTypeDef, object>>> {
-		const zodSchema = (await sandboxedSchema.runCode()) as z.ZodSchema<object>;
+		const zodSchema = await sandboxedSchema.runCode<z.ZodSchema<object>>();
 
 		let returnSchema: z.ZodSchema<object>;
 		if (nodeVersion === 1) {
@@ -129,8 +129,6 @@ export class OutputParserStructured implements INodeType {
 			},
 			{
 				...inputSchemaField,
-				displayName: 'JSON Schema',
-				description: 'JSON Schema to structure and validate the output against',
 				default: `{
 	"type": "object",
 	"properties": {
@@ -145,79 +143,6 @@ export class OutputParserStructured implements INodeType {
 		}
 	}
 }`,
-			},
-			{
-				displayName: 'Schema Type',
-				name: 'schemaType',
-				type: 'options',
-				noDataExpression: true,
-				options: [
-					{
-						name: 'Generate From JSON Example',
-						value: 'fromJson',
-						description: 'Generate a schema from an example JSON object',
-					},
-					{
-						name: 'Define Below',
-						value: 'manual',
-						description: 'Define the JSON schema manually',
-					},
-				],
-				default: 'fromJson',
-				description: 'How to specify the schema for the function',
-				displayOptions: {
-					show: {
-						'@version': [{ _cnd: { gte: 1.2 } }],
-					},
-				},
-			},
-			{
-				displayName: 'JSON Example',
-				name: 'jsonSchemaExample',
-				type: 'json',
-				default: `{
-	"state": "California",
-	"cities": ["Los Angeles", "San Francisco", "San Diego"]
-}`,
-				noDataExpression: true,
-				typeOptions: {
-					rows: 10,
-				},
-				displayOptions: {
-					show: {
-						schemaType: ['fromJson'],
-					},
-				},
-				description: 'Example JSON object to use to generate the schema',
-			},
-			{
-				displayName: 'Input Schema',
-				name: 'inputSchema',
-				type: 'json',
-				default: `{
-	"type": "object",
-	"properties": {
-		"state": {
-			"type": "string"
-		},
-		"cities": {
-			"type": "array",
-			"items": {
-				"type": "string"
-			}
-		}
-	}
-}`,
-				noDataExpression: true,
-				typeOptions: {
-					rows: 10,
-				},
-				displayOptions: {
-					show: {
-						schemaType: ['manual'],
-					},
-				},
-				description: 'Schema to use for the function',
 			},
 			{
 				displayName: 'JSON Schema',

@@ -1,6 +1,6 @@
-import { NDV, WorkflowExecutionsTab, WorkflowPage as WorkflowPageClass } from '../pages';
 import { SCHEDULE_TRIGGER_NODE_NAME, EDIT_FIELDS_SET_NODE_NAME } from '../constants';
-import { errorToast, successToast } from '../pages/notifications';
+import { NDV, WorkflowExecutionsTab, WorkflowPage as WorkflowPageClass } from '../pages';
+import { clearNotifications, errorToast, successToast } from '../pages/notifications';
 
 const workflowPage = new WorkflowPageClass();
 const executionsTab = new WorkflowExecutionsTab();
@@ -62,13 +62,13 @@ describe('Execution', () => {
 			.within(() => cy.get('.fa-check'))
 			.should('exist');
 
+		successToast().should('be.visible');
+		clearNotifications();
+
 		// Clear execution data
 		workflowPage.getters.clearExecutionDataButton().should('be.visible');
 		workflowPage.getters.clearExecutionDataButton().click();
 		workflowPage.getters.clearExecutionDataButton().should('not.exist');
-
-		// Check success toast (works because Cypress waits enough for the element to show after the http request node has finished)
-		successToast().should('be.visible');
 	});
 
 	it('should test manual workflow stop', () => {
@@ -106,6 +106,9 @@ describe('Execution', () => {
 			.canvasNodeByName('Set')
 			.within(() => cy.get('.fa-check').should('not.exist'));
 
+		successToast().should('be.visible');
+		clearNotifications();
+
 		workflowPage.getters.stopExecutionButton().should('exist');
 		workflowPage.getters.stopExecutionButton().click();
 
@@ -121,13 +124,13 @@ describe('Execution', () => {
 			.canvasNodeByName('Set')
 			.within(() => cy.get('.fa-check').should('not.exist'));
 
+		successToast().should('be.visible');
+		clearNotifications();
+
 		// Clear execution data
 		workflowPage.getters.clearExecutionDataButton().should('be.visible');
 		workflowPage.getters.clearExecutionDataButton().click();
 		workflowPage.getters.clearExecutionDataButton().should('not.exist');
-
-		// Check success toast (works because Cypress waits enough for the element to show after the http request node has finished)
-		successToast().should('be.visible');
 	});
 
 	it('should test webhook workflow', () => {
@@ -194,13 +197,13 @@ describe('Execution', () => {
 			.within(() => cy.get('.fa-check'))
 			.should('exist');
 
+		successToast().should('be.visible');
+		clearNotifications();
+
 		// Clear execution data
 		workflowPage.getters.clearExecutionDataButton().should('be.visible');
 		workflowPage.getters.clearExecutionDataButton().click();
 		workflowPage.getters.clearExecutionDataButton().should('not.exist');
-
-		// Check success toast (works because Cypress waits enough for the element to show after the http request node has finished)
-		successToast().should('be.visible');
 	});
 
 	it('should test webhook workflow stop', () => {
@@ -239,6 +242,9 @@ describe('Execution', () => {
 			});
 		});
 
+		successToast().should('be.visible');
+		clearNotifications();
+
 		workflowPage.getters.stopExecutionButton().click();
 		// Check canvas nodes after 1st step (workflow passed the manual trigger node
 		workflowPage.getters
@@ -268,13 +274,12 @@ describe('Execution', () => {
 			.canvasNodeByName('Set')
 			.within(() => cy.get('.fa-check').should('not.exist'));
 
+		successToast().should('be.visible');
+
 		// Clear execution data
 		workflowPage.getters.clearExecutionDataButton().should('be.visible');
 		workflowPage.getters.clearExecutionDataButton().click();
 		workflowPage.getters.clearExecutionDataButton().should('not.exist');
-
-		// Check success toast (works because Cypress waits enough for the element to show after the http request node has finished)
-		successToast().should('be.visible');
 	});
 
 	describe('execution preview', () => {
@@ -498,7 +503,7 @@ describe('Execution', () => {
 
 		workflowPage.getters.clearExecutionDataButton().should('be.visible');
 
-		cy.intercept('POST', '/rest/workflows/**/run').as('workflowRun');
+		cy.intercept('POST', '/rest/workflows/**/run?**').as('workflowRun');
 
 		workflowPage.getters
 			.canvasNodeByName('do something with them')
@@ -520,7 +525,7 @@ describe('Execution', () => {
 
 		workflowPage.getters.zoomToFitButton().click();
 
-		cy.intercept('POST', '/rest/workflows/**/run').as('workflowRun');
+		cy.intercept('POST', '/rest/workflows/**/run?**').as('workflowRun');
 
 		workflowPage.getters
 			.canvasNodeByName('If')
@@ -542,7 +547,7 @@ describe('Execution', () => {
 
 		workflowPage.getters.clearExecutionDataButton().should('be.visible');
 
-		cy.intercept('POST', '/rest/workflows/**/run').as('workflowRun');
+		cy.intercept('POST', '/rest/workflows/**/run?**').as('workflowRun');
 
 		workflowPage.getters
 			.canvasNodeByName('NoOp2')
@@ -571,7 +576,7 @@ describe('Execution', () => {
 	it('should successfully execute partial executions with nodes attached to the second output', () => {
 		cy.createFixtureWorkflow('Test_Workflow_pairedItem_incomplete_manual_bug.json');
 
-		cy.intercept('POST', '/rest/workflows/**/run').as('workflowRun');
+		cy.intercept('POST', '/rest/workflows/**/run?**').as('workflowRun');
 
 		workflowPage.getters.zoomToFitButton().click();
 		workflowPage.getters.executeWorkflowButton().click();
@@ -591,7 +596,7 @@ describe('Execution', () => {
 	it('should execute workflow partially up to the node that has issues', () => {
 		cy.createFixtureWorkflow('Test_workflow_partial_execution_with_missing_credentials.json');
 
-		cy.intercept('POST', '/rest/workflows/**/run').as('workflowRun');
+		cy.intercept('POST', '/rest/workflows/**/run?**').as('workflowRun');
 
 		workflowPage.getters.zoomToFitButton().click();
 		workflowPage.getters.executeWorkflowButton().click();
@@ -610,5 +615,46 @@ describe('Execution', () => {
 			.should('exist');
 
 		errorToast().should('contain', 'Problem in node ‘Telegram‘');
+	});
+
+	it('should not show pinned data in production execution', () => {
+		cy.createFixtureWorkflow('Execution-pinned-data-check.json');
+
+		workflowPage.getters.zoomToFitButton().click();
+		cy.intercept('PATCH', '/rest/workflows/*').as('workflowActivate');
+		workflowPage.getters.activatorSwitch().click();
+
+		cy.wait('@workflowActivate');
+		cy.get('body').type('{esc}');
+		workflowPage.actions.openNode('Webhook');
+
+		cy.contains('label', 'Production URL').should('be.visible').click();
+		cy.grantBrowserPermissions('clipboardReadWrite', 'clipboardSanitizedWrite');
+		cy.get('.webhook-url').click();
+		ndv.getters.backToCanvas().click();
+
+		cy.readClipboard().then((url) => {
+			cy.request({
+				method: 'GET',
+				url,
+			}).then((resp) => {
+				expect(resp.status).to.eq(200);
+			});
+		});
+
+		cy.intercept('GET', '/rest/executions/*').as('getExecution');
+		executionsTab.actions.switchToExecutionsTab();
+
+		cy.wait('@getExecution');
+		executionsTab.getters
+			.workflowExecutionPreviewIframe()
+			.should('be.visible')
+			.its('0.contentDocument.body')
+			.should('not.be.empty')
+
+			.then(cy.wrap)
+			.find('.connection-run-items-label')
+			.filter(':contains("5 items")')
+			.should('have.length', 2);
 	});
 });

@@ -40,12 +40,18 @@ const defaultCodeExecute = `const { PromptTemplate } = require('@langchain/core/
 
 const query = 'Tell me a joke';
 const prompt = PromptTemplate.fromTemplate(query);
+
+// If you are allowing more than one language model input connection (-1 or
+// anything greater than 1), getInputConnectionData returns an array, so you
+// will have to change the code below it to deal with that. For example, use
+// llm[0] in the chain definition
+
 const llm = await this.getInputConnectionData('ai_languageModel', 0);
 let chain = prompt.pipe(llm);
 const output = await chain.invoke();
 return [ {json: { output } } ];`;
 
-const defaultCodeSupplyData = `const { WikipediaQueryRun } = require('langchain/tools');
+const defaultCodeSupplyData = `const { WikipediaQueryRun } = require( '@langchain/community/tools/wikipedia_query_run');
 return new WikipediaQueryRun();`;
 
 const langchainModules = ['langchain', '@langchain/*'];
@@ -101,7 +107,7 @@ function getSandbox(
 	}
 	// eslint-disable-next-line @typescript-eslint/unbound-method
 
-	const sandbox = new JavaScriptSandbox(context, code, itemIndex, this.helpers, {
+	const sandbox = new JavaScriptSandbox(context, code, this.helpers, {
 		resolver: vmResolver,
 	});
 
@@ -120,6 +126,7 @@ export class Code implements INodeType {
 		displayName: 'LangChain Code',
 		name: 'code',
 		icon: 'fa:code',
+		iconColor: 'black',
 		group: ['transform'],
 		version: 1,
 		description: 'LangChain Code Node',
@@ -317,7 +324,7 @@ export class Code implements INodeType {
 		try {
 			items = await sandbox.runCodeAllItems(options);
 		} catch (error) {
-			if (!this.continueOnFail(error)) throw error;
+			if (!this.continueOnFail()) throw error;
 			items = [{ json: { error: (error as Error).message } }];
 			if (options.multiOutput) {
 				items = [items];
@@ -361,7 +368,7 @@ export class Code implements INodeType {
 		}
 
 		const sandbox = getSandbox.call(this, code.supplyData.code, { itemIndex });
-		const response = (await sandbox.runCode()) as Tool;
+		const response = await sandbox.runCode<Tool>();
 
 		return {
 			response: logWrapper(response, this),

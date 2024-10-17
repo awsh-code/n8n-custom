@@ -11,9 +11,25 @@ describe('Inline expression editor', () => {
 		cy.on('uncaught:exception', (error) => error.name !== 'ExpressionError');
 	});
 
+	describe('Basic UI functionality', () => {
+		it('should open and close inline expression preview', () => {
+			WorkflowPage.actions.zoomToFit();
+			WorkflowPage.actions.openNode('Schedule');
+			WorkflowPage.actions.openInlineExpressionEditor();
+			WorkflowPage.getters.inlineExpressionEditorInput().clear();
+			WorkflowPage.getters.inlineExpressionEditorInput().click().type('{{');
+			WorkflowPage.getters.inlineExpressionEditorInput().type('123');
+			WorkflowPage.getters.inlineExpressionEditorOutput().contains(/^123$/);
+			// click outside to close
+			ndv.getters.outputPanel().click();
+			WorkflowPage.getters.inlineExpressionEditorOutput().should('not.exist');
+		});
+	});
+
 	describe('Static data', () => {
 		beforeEach(() => {
 			WorkflowPage.actions.addNodeToCanvas('Hacker News');
+			WorkflowPage.actions.zoomToFit();
 			WorkflowPage.actions.openNode('Hacker News');
 			WorkflowPage.actions.openInlineExpressionEditor();
 		});
@@ -75,6 +91,7 @@ describe('Inline expression editor', () => {
 			ndv.actions.close();
 			WorkflowPage.actions.addNodeToCanvas('No Operation');
 			WorkflowPage.actions.addNodeToCanvas('Hacker News');
+			WorkflowPage.actions.zoomToFit();
 			WorkflowPage.actions.openNode('Hacker News');
 			WorkflowPage.actions.openInlineExpressionEditor();
 		});

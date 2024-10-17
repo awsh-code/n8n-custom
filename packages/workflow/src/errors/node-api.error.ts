@@ -1,7 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
+import { AxiosError } from 'axios';
 import { parseString } from 'xml2js';
+
+import { NodeError } from './abstract/node.error';
+import type { ReportingOptions } from './application.error';
+import {
+	NO_OP_NODE_TYPE,
+	UNKNOWN_ERROR_DESCRIPTION,
+	UNKNOWN_ERROR_MESSAGE,
+	UNKNOWN_ERROR_MESSAGE_CRED,
+} from '../Constants';
 import type {
 	INode,
 	JsonObject,
@@ -9,16 +19,7 @@ import type {
 	IStatusCodeMessages,
 	Functionality,
 } from '../Interfaces';
-import { NodeError } from './abstract/node.error';
 import { removeCircularRefs } from '../utils';
-import type { ReportingOptions } from './application.error';
-import { AxiosError } from 'axios';
-import {
-	NO_OP_NODE_TYPE,
-	UNKNOWN_ERROR_DESCRIPTION,
-	UNKNOWN_ERROR_MESSAGE,
-	UNKNOWN_ERROR_MESSAGE_CRED,
-} from '../Constants';
 
 export interface NodeOperationErrorOptions {
 	message?: string;
@@ -39,8 +40,9 @@ interface NodeApiErrorOptions extends NodeOperationErrorOptions {
 
 /**
  * Top-level properties where an error message can be found in an API response.
+ * order is important, precedence is from top to bottom
  */
-const ERROR_MESSAGE_PROPERTIES = [
+const POSSIBLE_ERROR_MESSAGE_KEYS = [
 	'cause',
 	'error',
 	'message',
@@ -60,6 +62,7 @@ const ERROR_MESSAGE_PROPERTIES = [
 	'errorDescription',
 	'error_description',
 	'error_summary',
+	'error_info',
 	'title',
 	'text',
 	'field',
@@ -68,9 +71,14 @@ const ERROR_MESSAGE_PROPERTIES = [
 ];
 
 /**
+ * Properties where a nested object can be found in an API response.
+ */
+const POSSIBLE_NESTED_ERROR_OBJECT_KEYS = ['Error', 'error', 'err', 'response', 'body', 'data'];
+
+/**
  * Top-level properties where an HTTP error code can be found in an API response.
  */
-const ERROR_STATUS_PROPERTIES = [
+const POSSIBLE_ERROR_STATUS_KEYS = [
 	'statusCode',
 	'status',
 	'code',
@@ -78,11 +86,6 @@ const ERROR_STATUS_PROPERTIES = [
 	'errorCode',
 	'error_code',
 ];
-
-/**
- * Properties where a nested object can be found in an API response.
- */
-const ERROR_NESTING_PROPERTIES = ['error', 'err', 'response', 'body', 'data'];
 
 /**
  * Descriptive messages for common HTTP status codes
@@ -187,7 +190,11 @@ export class NodeApiError extends NodeError {
 			this.httpCode = errorResponse.httpCode as string;
 		} else {
 			this.httpCode =
-				this.findProperty(errorResponse, ERROR_STATUS_PROPERTIES, ERROR_NESTING_PROPERTIES) ?? null;
+				this.findProperty(
+					errorResponse,
+					POSSIBLE_ERROR_STATUS_KEYS,
+					POSSIBLE_NESTED_ERROR_OBJECT_KEYS,
+				) ?? null;
 		}
 
 		this.level = level ?? 'warning';
@@ -222,8 +229,8 @@ export class NodeApiError extends NodeError {
 			} else {
 				this.description = this.findProperty(
 					errorResponse,
-					ERROR_MESSAGE_PROPERTIES,
-					ERROR_NESTING_PROPERTIES,
+					POSSIBLE_ERROR_MESSAGE_KEYS,
+					POSSIBLE_NESTED_ERROR_OBJECT_KEYS,
 				);
 			}
 		}
@@ -266,8 +273,8 @@ export class NodeApiError extends NodeError {
 			const topLevelKey = Object.keys(result)[0];
 			this.description = this.findProperty(
 				result[topLevelKey],
-				ERROR_MESSAGE_PROPERTIES,
-				['Error'].concat(ERROR_NESTING_PROPERTIES),
+				POSSIBLE_ERROR_MESSAGE_KEYS,
+				POSSIBLE_NESTED_ERROR_OBJECT_KEYS,
 			);
 		});
 	}
